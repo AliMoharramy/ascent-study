@@ -42,7 +42,9 @@
     "telegram:bot": "tsx scripts/telegram-bot.ts",
     "icons:gen": "node scripts/gen-icons.mjs",
     "perf:budget": "node scripts/perf-budget.mjs",
-    "visual": "node scripts/visual-regression.mjs"
+    "visual": "node scripts/visual-regression.mjs",
+    "demo:seed": "tsx scripts/demo-seed.ts",
+    "screenshots": "node scripts/screenshots.mjs"
   },
   "dependencies": {
     "@fontsource/bebas-neue": "5.3.0",
