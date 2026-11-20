@@ -25,7 +25,7 @@ jobs:
       DISABLE_JOBS: "true"
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -76,7 +76,7 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:3000/api/tests)" = "401"
           curl -fsS localhost:3000/login | grep -q 'First-run setup'
           test "$(docker exec ascent-pg psql -U ascent -d ascent -Atc 'SELECT count(*) FROM chapters')" = "93"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Page-level smoke test (first-run, login, every page, key APIs)
