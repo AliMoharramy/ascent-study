@@ -18,8 +18,8 @@ It is now open source so others can run it for themselves, adapt it to their own
 
 - Fix a bug (a failing case with a test is the best bug report).
 - Improve docs — especially English docs (most design docs under `docs/` are in Persian) and the README.
-- Make the exam **configurable** (dates, subjects, coefficients, week grid) — the biggest open item, see the roadmap in
-  the README. Please open a discussion/issue before starting, because it touches many modules.
+- Make the exam **configurable** (dates, subjects, coefficients, week grid) — the biggest open item, see
+  [`ROADMAP.md`](ROADMAP.md). Please open a discussion/issue before starting, because it touches many modules.
 - Translate UI strings or add a locale.
 - Add tests (see below), or accessibility improvements.
 
@@ -32,7 +32,12 @@ git clone <your fork>
 cd <repo>
 make dev            # starts PostgreSQL in Docker, migrates, seeds, creates a dev user, serves on http://localhost:3100
 make login          # prints the URL and the dev username
+make demo           # or: a separate database with three weeks of sample data (demo / demo-password-123)
 ```
+
+Use `make demo` when you work on a page: it has history, streaks and a few cleared chapters, so charts and empty states
+are both easy to see. If your change alters how a page looks, regenerate the README gallery with
+`npm run screenshots -- --base http://localhost:3100` (needs Chrome or Edge) and include the updated images.
 
 Without `make`: see "Option B — manual npm" in the README.
 

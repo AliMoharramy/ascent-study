@@ -5,6 +5,10 @@
 ![Node 22](https://img.shields.io/badge/node-22-339933)
 ![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-336791)
 
+<p align="center">
+  <img src="docs/images/hero.webp" alt="The Today screen of THE ASCENT in its dark and cream themes: a focus timer, three quest tiers, a coach card and a countdown to the exam" width="900">
+</p>
+
 **A self-hosted, gamified study + habit engine.** One mission, the nearest boss, nothing else on the screen: it turns a
 months-long exam campaign into a climb — quests, XP, rivals, bosses, loot, rest and review — while an event-sourced
 ledger keeps every number honest and replayable.
@@ -27,6 +31,43 @@ English headings. The app works fully **without any AI key**; remote AI is an op
 - **Deploy anywhere:** Vercel + Neon (free tiers work), or Docker Compose on your own server.
 - **Calm by default:** no guilt, no streak-shaming; penalties start only after you confirm your baseline week.
 - **~400 automated tests** (unit, PostgreSQL integration/concurrency) plus a page-level smoke test in CI.
+
+## A look around
+
+Everything below runs on the built-in **demo data** (three weeks of sample study history — see
+[Try it with demo data](#try-it-with-demo-data)), so you can see the numbers move without entering a thing.
+
+| | |
+|---|---|
+| ![Today: focus timer, quests, coach](docs/images/today-night.webp)<br>**Today** — one mission, the nearest boss, a timer. | ![World map with realms and cleared chapters](docs/images/map-night.webp)<br>**Map** — every chapter is a node; two spaced, solid tests clear it. |
+| ![Habit Lab with streak grids](docs/images/habits-night.webp)<br>**Habit Lab** — tiny / standard / stretch tiers, a calm streak grid, identity votes. | ![Forge: error notebook with causes](docs/images/forge-night.webp)<br>**Forge** — turn every mistake into a one-line lesson and a review. |
+| ![Plan: 25-week load calendar](docs/images/plan-night.webp)<br>**Plan** — capacity-aware weeks, triage and a burn-gap check. | ![Character sheet with attributes and achievements](docs/images/character-night.webp)<br>**Character** — XP, attributes and achievements. Numbers you can replay and audit. |
+
+<details>
+<summary>The same screens in the cream (light) theme, plus Arena and Review</summary>
+
+| | |
+|---|---|
+| ![Today, cream theme](docs/images/today-cream.webp) | ![Map, cream theme](docs/images/map-cream.webp) |
+| ![Arena: rival, duels and bosses](docs/images/arena-night.webp) | ![Weekly and nightly reviews](docs/images/review-night.webp) |
+
+</details>
+
+> The interface is Persian (RTL) with Jalali dates; screenshots are taken with the English headings you see in the app.
+
+## Try it with demo data
+
+No account, no typing — one command gives you a separate database with three weeks of realistic sample history
+(focus blocks, tests, a few Chapter Clears, habit streaks, error notes, reviews), generated through the same services
+the UI uses:
+
+```bash
+make demo         # Node 22 + Docker; then sign in as  demo / demo-password-123  at http://localhost:3100
+```
+
+Without `make`: `npm run db:migrate && npm run demo:seed` against an **empty local** database (the script refuses to
+touch a non-local one, or one that already has an account). To regenerate the screenshots above after a UI change, run
+the app against that database and `npm run screenshots -- --base http://localhost:3000`.
 
 ## Quick start
 
@@ -64,7 +105,7 @@ biggest piece of planned work and a great place to contribute — see [CONTRIBUT
 
 ## Contents
 
-1. [Status & roadmap](#status--roadmap)
+1. [Status & roadmap](#status--roadmap) (full list: [`ROADMAP.md`](ROADMAP.md))
 2. [Feature tour](#feature-tour)
 3. [Core game concepts](#core-game-concepts)
 4. [Quick start (detailed)](#quick-start-1)
@@ -326,6 +367,7 @@ npm run visual           # pixelmatch visual regression vs baselines (needs an i
 |---|---|
 | `make` / `make help` | Print the target list |
 | `make dev` | deps → start local PostgreSQL → migrate → seed → ensure test user → serve on `$(PORT)` |
+| `make demo` | Like `dev`, but in a separate `ascent_demo` database seeded with three weeks of sample data (`demo` / `demo-password-123`) |
 | `make login` | Print URL + test username |
 | `make db-stop` | Stop the local PostgreSQL container (data kept) |
 | `make test` / `make test-pg` / `make lint` / `make typecheck` / `make build` | Pass-through to the npm scripts (`test-pg` starts the local database first) |
@@ -354,6 +396,8 @@ database environment through an explicit `sh -c` wrapper — do not "simplify" i
 | `seed:validate` / `art:validate` | Validate seed YAML (CI) / art assets (local) |
 | `perf:budget` | Assert initial JS ≤ 200 KB gzip on `/today` (NFR-02); runs in CI |
 | `visual` | Visual regression (pixelmatch) of 5 main pages × Night/Cream vs committed baselines; run against an isolated QA server (`--base http://localhost:3103`, `--update` to re-baseline) |
+| `demo:seed` | Fill an **empty local** database with three weeks of realistic sample data (refuses non-local databases) |
+| `screenshots` | Regenerate `docs/images/*` (README gallery, hero, social preview) from a running app with demo data; needs Chrome/Edge |
 | `icons:gen` | Generate app/PWA icons from source art |
 | `telegram:bot` | Telegram bot helper for the opt-in reminder channel (chat-id discovery / polling) |
 | `backup` | One verified backup file in `BACKUP_DIR` (30 kept) |

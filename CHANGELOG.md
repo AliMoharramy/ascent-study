@@ -6,6 +6,9 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Demo data (`npm run demo:seed`, `make demo`): three weeks of realistic sample history in a throw-away local database, and a
+  regenerable screenshot gallery (`npm run screenshots`) used by the README.
+- `ROADMAP.md`.
 - Open-source preparation: MIT `LICENSE`, `NOTICE`, `CONTRIBUTING`, `CODE_OF_CONDUCT`, `SECURITY`, issue/PR templates,
   Dependabot, CodeQL (public repos), `CODEOWNERS`.
 - Optional `SETUP_TOKEN` to protect the first-run account creation on internet-reachable deployments.
