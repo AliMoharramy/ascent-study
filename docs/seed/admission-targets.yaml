@@ -1,0 +1,82 @@
+# seed/admission-targets.yaml
+# هدف‌های کمّی قبولی (شریف، امیرکبیر، علم‌وصنعت، تهران) — گزارش: docs/research/T-DATA-04-admission-records.md
+# kind: claim = ادعای منبع ؛ computed = محاسبهٔ من از دادهٔ خام بانک کارنامه ؛ recommendation = پیشنهاد من
+# ⚠ همهٔ درصدها با ساختار قدیم (۴ کد ضریب، ۶ باکس) هستند. «درصد» = «میانگین درصد ضریب» زیرگروه مربوط به گرایش قبولی در کارنامه (درصد خالص با منفی).
+# ⚠ نمونه خوداظهار/گزینشی است (بیشتر دانشجویان مشاوره cshub + جمع‌آوری از اینترنت) → سوگیری به سمت رتبه‌های خوب.
+
+source:
+  karnameh_bank_url: "https://cshub.ir/konkur-computer-results/"
+  ranks_article_url: "https://cshub.ir/رتبه-قبولی-ارشد-کامپیوتر-در-دانشگاه-ها/"
+  extracted_jalali: "1405-08-23"
+  rows_total: 2518                 # computed: کل ردیف‌های جدول (1400: 271، 1401: 282، 1402: 242، 1403: 529، 1404: 805، 1405: 389)
+  rows_free_quota: 2182            # computed: سهمیه 0 (آزاد)
+  filter_used: "سهمیه آزاد (0)، روزانه (بدون نوبت دوم/پردیس/مجازی/شبانه)، دانشگاه از متن ستون «قبولی»"
+  note_1405: "کارنامه‌های 1405 در بانک هست ولی محل قبولی ندارند (نتایج نهایی هنوز نیامده/ثبت نشده)؛ فقط برای رابطهٔ رتبه↔درصد استفاده شد."
+
+claims:                            # kind: claim
+  statements:
+  - { kind: claim, text: "رتبهٔ تک‌رقمی ≈ پاسخ به ۵۰٪ سؤالات با احتساب منفی", source: "https://cshub.ir/konkur-computer-results/" }
+  - { kind: claim, text: "میانگین درصد رتبه‌های زیر ۱۰۰ ≈ ۳۵٪", source: "https://cshub.ir/konkur-computer-results/" }
+  - { kind: claim, text: "قبولی در دانشگاه‌های شهر تهران ≈ ۲۵٪", source: "https://cshub.ir/konkur-computer-results/" }
+  - { kind: claim, text: "میانگین درصد تک‌رقمی‌های ارشد مهندسی کامپیوتر ≈ ۵۵٪", source: "https://cshub.ir/میزان-رقابت-در-کنکور-ارشد-کامپیوتر/" }
+  - { kind: claim, text: "حدود ۳۰٪ ظرفیت هر گرایش/دانشگاه به سهمیه ۲۵٪ و ۵٪ ایثارگران می‌رسد", source: "https://cshub.ir/konkur-computer-results/" }
+  last_rank_in_quota_1400_1403:    # kind: claim — «آخرین رتبهٔ قبولی (رتبه در سهمیه)» تقریبی، از کارنامه‌های 1400 تا 1403
+    source: "https://cshub.ir/رتبه-قبولی-ارشد-کامپیوتر-در-دانشگاه-ها/"
+    ai:            { subgroup: 2, sharif: 30,  ut: 50,  amirkabir: 110, iust: 170 }
+    software:      { subgroup: 4, sharif: 90,  ut: 129, amirkabir: 137, iust: 286 }
+    networks:      { subgroup: 1, sharif: 152, ut: null, amirkabir: 203, iust: 274 }
+    secure_comp:   { subgroup: 1, sharif: 116, ut: null, amirkabir: 190, iust: null }
+    architecture:  { subgroup: 3, sharif: 160, ut: 204, amirkabir: 303, iust: 334 }
+    algorithms:    { subgroup: 4, sharif: 92,  ut: 281, amirkabir: null, iust: null }
+    bioinformatics: { subgroup: 4, sharif: 85 }
+
+computed_rank_to_pct:              # kind: computed — میانهٔ «میانگین درصد ضریب» برای رتبه‌های سهمیه آزاد در بازهٔ ±20٪ حول رتبهٔ هدف (هر ۴ زیرگروه)
+  kind: computed
+  method: "median of weighted-average % over all (rank, %) pairs with 0.8T ≤ rank ≤ 1.2T, free quota"
+  "1402": { 10: 54.9, 30: 49.5, 50: 43.4, 100: 36.6, 150: 33.5, 200: 31.8, 300: 28.4, 400: 24.4 }
+  "1403": { 10: 46.2, 30: 41.0, 50: 39.0, 100: 34.2, 150: 31.4, 200: 29.1, 300: 25.6, 400: 22.9 }
+  "1404": { 10: 56.8, 30: 50.5, 50: 45.9, 100: 41.4, 150: 39.5, 200: 36.8, 300: 33.5, 400: 31.3 }
+  "1405": { 10: 53.6, 30: 48.6, 50: 46.5, 100: 42.5, 150: 38.9, 200: 36.5, 300: 32.1, 400: 29.4 }
+
+computed_by_university:            # kind: computed — پذیرفته‌شدگان آزاد/روزانه در بانک؛ pct = «میانگین درصد ضریب» زیرگروه گرایش قبولی؛ rank = رتبه در سهمیه
+  kind: computed
+  sharif:
+    "1400": { n: 25, pct_min: 22.4, pct_median: 34.2, pct_mean: 36.5, rank_median: 53,  rank_max: 179 }
+    "1401": { n: 28, pct_min: 24.8, pct_median: 34.3, pct_mean: 34.5, rank_median: 38.5, rank_max: 181 }
+    "1402": { n: 24, pct_min: 31.3, pct_median: 42.2, pct_mean: 43.7, rank_median: 65,  rank_max: 160 }
+    "1403": { n: 33, pct_min: 31.1, pct_median: 36.9, pct_mean: 39.2, rank_median: 60,  rank_max: 147 }
+    "1404": { n: 33, pct_min: 32.6, pct_median: 44.2, pct_mean: 47.3, rank_median: 74,  rank_max: 203 }
+    all:    { n: 143, pct_p25: 34.2, pct_median: 39.9, pct_mean: 40.4, rank_median: 59 }
+  ut:
+    "1400": { n: 9,  pct_min: 24.7, pct_median: 31.9, pct_mean: 31.7, rank_median: 67,  rank_max: 193 }
+    "1401": { n: 16, pct_min: 20.9, pct_median: 26.4, pct_mean: 26.7, rank_median: 102.5, rank_max: 215 }
+    "1402": { n: 13, pct_min: 2.3,  pct_median: 34.7, pct_mean: 35.0, rank_median: 122.5, rank_max: 212, note: "pct_min=2.3 احتمالاً ردیف ناقص/خطای ورود داده" }
+    "1403": { n: 24, pct_min: 26.6, pct_median: 34.2, pct_mean: 34.8, rank_median: 112.5, rank_max: 281 }
+    "1404": { n: 32, pct_min: 26.8, pct_median: 42.2, pct_mean: 41.7, rank_median: 95.5, rank_max: 667 }
+    all:    { n: 94, pct_p25: 30.1, pct_median: 34.7, pct_mean: 35.5, rank_median: 96 }
+  amirkabir:
+    "1400": { n: 11, pct_min: 9.8,  pct_median: 27.5, pct_mean: 25.1, rank_median: 125, rank_max: 994 }
+    "1401": { n: 26, pct_min: 11.6, pct_median: 21.6, pct_mean: 22.0, rank_median: 246, rank_max: 726 }
+    "1402": { n: 5,  pct_min: 20.0, pct_median: 32.9, pct_mean: 29.8, rank_median: 186, rank_max: 824 }
+    "1403": { n: 24, pct_min: 11.3, pct_median: 31.0, pct_mean: 29.8, rank_median: 150, rank_max: 993 }
+    "1404": { n: 18, pct_min: 34.0, pct_median: 39.2, pct_mean: 39.0, rank_median: 145.5, rank_max: 385 }
+    all:    { n: 84, pct_p25: 22.9, pct_median: 28.2, pct_mean: 28.8, rank_median: 172 }
+  iust:
+    "1400": { n: 8,  pct_min: 16.6, pct_median: 24.7, pct_mean: 23.9, rank_median: 208.5, rank_max: 443 }
+    "1401": { n: 15, pct_min: 15.1, pct_median: 23.2, pct_mean: 21.9, rank_median: 198, rank_max: 555 }
+    "1402": { n: 9,  pct_min: 26.4, pct_median: 30.2, pct_mean: 30.1, rank_median: 242, rank_max: 286 }
+    "1403": { n: 22, pct_min: 22.4, pct_median: 29.2, pct_mean: 28.5, rank_median: 213, rank_max: 340 }
+    "1404": { n: 27, pct_min: 29.8, pct_median: 34.9, pct_mean: 34.6, rank_median: 254, rank_max: 572 }
+    all:    { n: 81, pct_p25: 25.2, pct_median: 30.2, pct_mean: 29.0, rank_median: 230 }
+
+targets:                           # kind: recommendation (من) — بر پایهٔ 1404/1405 که بالاترین سطح درصدها را داشته‌اند
+  kind: recommendation
+  operational_net_pct: 40          # هدف عملیاتی سیستم (به‌جای 35) — ≈ رتبهٔ آزاد ~120-150 در 1404/1405
+  floor_net_pct: 35                # کف قابل‌قبول (≈ رتبهٔ ~250 در 1404/1405 ← علم‌وصنعت/امیرکبیر در گرایش‌های کم‌رقابت‌تر)
+  stretch_net_pct: 45              # کشش (≈ رتبه ~50-70 در 1404/1405 ← شریف/تهران در اغلب گرایش‌ها)
+  metric: "weighted net % = (1*english + 2*math + 4*specialized)/7 روی آزمون‌های جامع (آزمایشی 9..13 و Mini-Trialهای جامع)"
+  rank_goal_free_quota: "≤ ~200 (ایمن برای هر ۴ دانشگاه در حداقل یک گرایش)؛ ≤ ~100 برای انتخاب آزاد گرایش"
+  caveats:
+    - "ساختار ۱۴۰۶ جدید است: ضرایب 1/2/4 و یک رتبه؛ توزیع درصدها ممکن است جابه‌جا شود."
+    - "آزمون‌های آزمایشی cshub ممکن است سخت‌تر/آسان‌تر از کنکور باشند؛ هدف را با رتبهٔ کاربر در لیدربورد آزمون‌ها هم کالیبره کن."
+    - "جبر خطی حذف‌شده: سقف درصد ریاضیات کاربر ≈ 67٪ (اگر سه درس هم‌وزن باشند) → برای 40٪ وزنی باید تخصصی‌ها ≈ 45٪+ باشند."

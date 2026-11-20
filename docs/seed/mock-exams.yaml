@@ -1,0 +1,30 @@
+# seed/mock-exams.yaml
+# منبع: جدول «برنامه زمانی ۱۳ مرحله آزمون آزمایشی cshub» (تصویر، خوانده‌شده در 22 آبان 1405)
+# ⚠ ارقام از روی تصویر خوانده شده‌اند؛ در گام Import باید با تصویر اصلی دوباره تطبیق داده شوند.
+# ⚠ بودجه‌بندی هر آزمون به تفکیک درس و فصل در ۱۳ تصویر جداگانه است و هنوز استخراج نشده (کار T-DATA-03).
+# پس از تاریخ اصلی، آزمون‌ها «شناور» می‌شوند: هر زمان بخواهی شرکت می‌کنی، کارنامه روزانه صادر می‌شود،
+# ولی اسم تو دیگر در لیدربورد اصلی نمی‌آید.
+# کاربر ثبت‌نام کرده است. تصمیم کاربر: فعلاً آزمون نمی‌دهیم؛ در انتها همه را از اول می‌دهیم.
+
+provider: cshub.ir
+user_registered: true
+user_policy: "defer_all_then_binge_late"   # آزمون‌ها به عقب رانده می‌شوند و در فاز Arena پشت‌سرهم داده می‌شوند
+
+exams:
+  - { no: 1,  date_jalali: "1405-05-23", questions: 35,  minutes: 100, status: floating }
+  - { no: 2,  date_jalali: "1405-06-20", questions: 35,  minutes: 100, status: floating }
+  - { no: 3,  date_jalali: "1405-07-17", questions: 50,  minutes: 140, status: floating }
+  - { no: 4,  date_jalali: "1405-08-22", questions: 50,  minutes: 135, status: floating_from_today }
+  - { no: 5,  date_jalali: "1405-09-20", questions: 55,  minutes: 145 }
+  - { no: 6,  date_jalali: "1405-10-18", questions: 65,  minutes: 170 }
+  - { no: 7,  date_jalali: "1405-11-16", questions: 65,  minutes: 165 }
+  - { no: 8,  date_jalali: "1405-12-07", questions: 65,  minutes: 150 }
+  - { no: 9,  date_jalali: "1405-12-21", questions: 90,  minutes: 185 }
+  - { no: 10, date_jalali: "1406-01-06", questions: 115, minutes: 250 }
+  - { no: 11, date_jalali: "1406-01-19/20", questions: 80, minutes: 160 }
+  - { no: 12, date_jalali: "1406-02-02/03", questions: 90, minutes: 185 }  # corrected 1405-08-23 from cshub schedule (docs/research/T-DATA-03)
+  - { no: 13, date_jalali: "1406-02-09/10", questions: 80, minutes: 160 }
+
+# مجموع سؤال‌های زبان در آزمون‌های جامع (۹ به بعد) طبق تصویر: لغت 7 + گرامر 3 + درک مطلب 15 ≈ 25 (تقریبی)
+# درس‌های جبر خطی در آزمون‌ها حضور دارند؛ چون کاربر جبر خطی را نمی‌خواند، این بخش‌ها در تحلیل کارنامه
+# به‌صورت «نزده عمدی» علامت‌گذاری می‌شوند تا ضعف علمی محسوب نشوند.

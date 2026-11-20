@@ -1,0 +1,94 @@
+# seed/exam-structure.yaml
+# ساختار کنکور کارشناسی ارشد ۱۴۰۶ — «مهندسی و علم کامپیوتر» (کد مجموعه 1277)
+# گزارش کامل و لینک‌ها: docs/research/T-DATA-01-exam-date.md و docs/research/T-DATA-02-coefficients.md
+# قاعده: هر عدد یا منبع دارد، یا assumed:true / estimated:true است. تاریخ استخراج: 1405-08-23.
+
+exam:
+  name_fa: "مهندسی و علم کامپیوتر"
+  group_code: 1277
+  year_jalali: 1406
+  first_year_of_new_structure: true
+  single_rank: true                 # فقط یک کد ضریب (1) و یک رتبه برای همه گرایش‌ها
+  coefficient_code: 1
+  source_coefficients: "https://cshub.ir/wp-content/uploads/2026/07/مهندسی-و-علم-کامپیوتر.jpg"   # بازنشر جدول مواد و ضرایب ۱۴۰۶ سازمان سنجش در صفحه https://cshub.ir/computer-questions-timing/
+  source_coefficients_note: "تصویر، جدول رسمی سنجش (سربرگ «1277– مهندسی و علم کامپیوتر») است که cshub بازنشر کرده؛ نسخهٔ اصلی روی sanjesh.org مستقیماً بازبینی نشد (403)."
+  source_coefficients_verified: "2026-11-17: تصویر جدول مستقیماً بازبینی شد — ضرایب 1/2/4 و کد ضریب 1 برای هر ۱۴ رشته، عیناً مطابق groups بالا. کنترل متقابل: mastertest.ir همان سه ردیف را منسوب به دفترچه ثبت‌نام ۱۴۰۶ فهرست می‌کند."
+
+dates:
+  exam_days_jalali: ["1406-02-16", "1406-02-17"]       # پنجشنبه و جمعه — اعلام سنجش طبق دیجیاتو (15 اردیبهشت 1405) و cshub
+  exam_days_gregorian: ["2027-05-06", "2027-05-07"]
+  group_day: unknown          # روز/نوبت برگزاری گروه 1277 هنوز اعلام نشده (روی کارت ورود به جلسه)
+  planning_date_jalali: "1406-02-16"   # پیشنهاد: برنامه را برای روز زودتر (پنجشنبه) قفل کن تا اگر گروه پنجشنبه بود غافلگیر نشوی
+  registration_jalali: ["1405-09-16", "1405-09-22"]
+  confidence: medium_high     # تاریخ اعلام‌شده است ولی آزمون ۱۴۰۵ به تعویق افتاد (precedent)
+
+groups:                       # ضرایب «دروس امتحانی بر اساس شماره دروس» در جدول 1277
+  - id: english
+    exam_item: 1
+    name_fa: "زبان عمومی و تخصصی (انگلیسی)"
+    coefficient: 1
+    subjects: [english]
+  - id: math
+    exam_item: 2
+    name_fa: "ریاضیات (ریاضیات گسسته، آمار و احتمال مهندسی، جبر خطی)"
+    coefficient: 2
+    subjects: [discrete, stats, linear_algebra]
+  - id: specialized
+    exam_item: 3
+    name_fa: "دروس تخصصی (مبانی کامپیوتر و برنامه‌سازی، مدارهای منطقی، معماری کامپیوتر، داده‌ساختارها و الگوریتم‌ها، نظریه زبان‌ها و ماشین‌ها، سیستم‌های عامل، هوش مصنوعی)"
+    coefficient: 4
+    subjects: [foundations, logic, arch, dsa, toc, os, ai]
+
+weighted_score:
+  formula: "(1*english_pct + 2*math_pct + 4*specialized_pct) / 7"
+  share: { english: 0.143, math: 0.286, specialized: 0.571 }   # = ضریب / 7 (محاسبهٔ من)
+  note: "سنجش رتبه را بر پایهٔ «تراز» (نمرهٔ استانداردشده) می‌دهد، نه درصد خام؛ این فرمول فقط برای پیش‌بینی/هدف‌گذاری داخلی است."
+  linear_algebra_drop_cost:
+    max_math_pct_if_dropped_assumed: 0.667     # اگر سه درس ریاضیات هم‌وزن باشند (assumed)
+    max_loss_of_weighted_score: 0.095          # = (2/7) × (1/3) — محاسبهٔ من بر فرض بالا
+    assumed: true
+
+question_counts_1406:
+  status: not_published       # cshub: «تعداد تست‌ها و زمان آزمون ۱۴۰۶ هنوز مشخص نیست» (https://cshub.ir/computer-questions-timing/)
+  duration_min: null
+
+fallback_1405_old_structure:  # آخرین ساختار قدیم — فقط مرجع، assumed برای ۱۴۰۶
+  assumed: true
+  source: "https://mastertest.ir/1391/07/%d8%b3%d8%b1%d9%81%d8%b5%d9%84-%da%a9%d8%a7%d8%b1%d8%b4%d9%86%d8%a7%d8%b3%db%8c-%d8%a7%d8%b1%d8%b4%d8%af-%da%a9%d8%a7%d9%85%d9%be%db%8c%d9%88%d8%aa%d8%b1/"   # جدول منسوب به دفترچه ۱۴۰۵
+  boxes:
+    - { name: "زبان عمومی و تخصصی", questions: 25 }
+    - { name: "ریاضیات (ریاضی عمومی ۱و۲، آمار، گسسته)", questions: 20 }
+    - { name: "تخصصی ۱: نظریه زبان‌ها + سیگنال", questions: 10 }
+    - { name: "تخصصی ۲: ساختمان داده، طراحی الگوریتم، هوش", questions: 20 }
+    - { name: "تخصصی ۳: مدار منطقی، معماری، الکترونیک دیجیتال", questions: 20 }
+    - { name: "تخصصی ۴: سیستم‌عامل، شبکه، پایگاه داده", questions: 20 }
+  total_questions: 115        # جمع ردیف‌ها (محاسبهٔ من)
+  duration_min: 240           # ادعای cshub: «زمان کنکور مهندسی کامپیوتر ۲۴۰ دقیقه ... ۱۱۵ تست» https://cshub.ir/کنکور-کامپیوتر-چگونه-است/
+  per_subject_1405:           # از جدول‌های بودجه‌بندی cshub (ستون 1405) — https://cshub.ir/computer-konkur-sections/
+    discrete: 6
+    stats: 7
+    toc: 5
+    dsa_old: 12               # ساختمان داده + طراحی الگوریتم (قدیم)
+    ai: 8
+    logic: 7
+    arch: 7
+    os: 7
+    english: 25
+
+assumed_1406_scenarios:       # برای شبیه‌سازی/فرم آزمون در سیستم تا اعلام رسمی — همه assumed
+  - id: cshub_mock_full
+    assumed: true
+    source: "https://cshub.ir/online-simulation-test/"   # آزمون آزمایشی 10 cshub (جامع کامل)
+    per_subject: { english: 25, discrete: 7, stats: 6, linear_algebra: 7, foundations: 10, dsa: 10, toc: 10, ai: 10, logic: 10, arch: 10, os: 10 }
+    total: 115
+    duration_min: 250
+  - id: cshub_mock_final
+    assumed: true
+    source: "https://cshub.ir/online-simulation-test/"   # آزمون آزمایشی 12 cshub
+    per_subject: { english: 25, discrete: 7, stats: 6, linear_algebra: 7, foundations: 6, dsa: 8, toc: 6, ai: 7, logic: 6, arch: 6, os: 6 }
+    total: 90
+    duration_min: 185
+
+negative_marking:
+  wrong_answer_penalty: 0.333   # هر پاسخ غلط = −⅓ پاسخ درست (روال سال‌های قبل سنجش)
+  assumed: true                 # در این پژوهش از دفترچهٔ ۱۴۰۶ تأیید نشد

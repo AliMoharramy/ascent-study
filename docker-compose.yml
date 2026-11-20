@@ -1,0 +1,69 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ascent_dev
+      POSTGRES_PASSWORD: local-dev-only
+      POSTGRES_DB: ascent_dev
+      TZ: Asia/Tehran
+    ports:
+      - "127.0.0.1:${PG_PORT:-54329}:5432"
+    volumes:
+      - ascent-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ascent_dev -d ascent_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  app:
+    profiles: [selfhost]
+    build: .
+    image: the-ascent:${APP_VERSION:-latest}
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://ascent_dev:local-dev-only@postgres:5432/ascent_dev
+      BACKUP_DIR: /data/backups
+      OFFSITE_DIR: /data/offsite
+      TZ: Asia/Tehran
+      DISABLE_JOBS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ascent-backups:/data
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  caddy:
+    profiles: [selfhost]
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  ascent-postgres:
+  ascent-backups:
+  caddy-data:
+  caddy-config:

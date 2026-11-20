@@ -1,0 +1,228 @@
+# seed/subjects.yaml
+# منبع سرفصل‌ها: صفحه «آزمون آزمایشی» سامانه cshub.ir (استخراج‌شده در 22 آبان 1405)
+# ساختار آزمون ۱۴۰۶: زبان انگلیسی + ریاضیات + ۷ درس تخصصی (ضریب یکسان). تعداد سؤال هر درس هنوز اعلام نشده.
+# فیلدهای estimated:true یعنی عدد تخمینی است و باید پس از هفتهٔ پایه (Baseline) با داده‌ی واقعی جایگزین شود.
+# status: active | dropped (کاربر حذف کرده) | optional
+
+meta:
+  exam_date_jalali: "1406-02-16"
+  exam_date_gregorian: "2027-05-06"   # تاریخ قفل برنامه: روز زودتر از بازهٔ گزارش‌شدهٔ 16–17 اردیبهشت
+  project_start_jalali: "1405-08-29"
+  project_start_gregorian: "2026-11-20"   # شروع واقعی مطالعه: امروزِ راه‌اندازی (تصمیم کاربر، D37)
+  weeks_total: 25
+  user_priority_order:          # ترتیب انتخابی کاربر
+    - [ai, discrete]
+    - [dsa, logic]
+    - [arch, toc]
+    - [os, stats]               # "بقیه دروس" - ترتیب داخلی پیشنهادی است
+  daily_fixed:
+    - { subject: foundations, rule: "10 tests/day", note: "کاربر مبانی را بلد است؛ فقط تست" }
+    - { subject: english,     rule: "20 min/day study-or-tests" }
+
+subjects:
+
+  - id: ai
+    name_fa: هوش مصنوعی
+    name_en: Artificial Intelligence
+    group: specialized
+    status: active
+    priority_phase: 1
+    chapters:
+      - { no: 1,  title: مفاهیم اولیه }
+      - { no: 2,  title: عامل‌های هوشمند }
+      - { no: 3,  title: حل مسئله با جست‌وجو }
+      - { no: 4,  title: فراتر از جست‌وجوی کلاسیک }
+      - { no: 5,  title: جست‌وجوی خصمانه (بازی‌ها) }
+      - { no: 6,  title: مسائل ارضای محدودیت }
+      - { no: 7,  title: عامل‌های منطقی }
+      - { no: 8,  title: منطق مرتبه اول }
+      - { no: 9,  title: استنتاج در منطق مرتبه اول }
+      - { no: 10, title: برنامه‌ریزی کلاسیک }
+      - { no: 11, title: عدم قطعیت }
+      - { no: 12, title: استنتاج احتمالی, optional: true }
+      - { no: 13, title: مفاهیم یادگیری ماشین, optional: true }
+      - { no: 14, title: فرایند تصمیم‌گیری مارکوف, optional: true }
+    courses:
+      - { id: ai-teach, kind: teaching,  instructor: محمد انصاری, platform: parlike, sessions: 22, duration_min: 3389 }  # 56:29
+      - { id: ai-tips,  kind: tips_tests, instructor: محمد انصاری, platform: parlike, sessions: 17, duration_min: 2613 }  # 43:33
+
+  - id: discrete
+    name_fa: ریاضیات گسسته
+    name_en: Discrete Mathematics
+    group: math
+    status: active
+    priority_phase: 1
+    chapters:
+      - { no: 1, title: منطق و گزاره‌ها }
+      - { no: 2, title: شمارش }
+      - { no: 3, title: روابط بازگشتی و تابع مولد }
+      - { no: 4, title: رابطه، تابع و مجموعه }
+      - { no: 5, title: "مجموعه‌های مرتب جزئی (Poset) و لاتیس" }   # در منبع «پاست و لاتیس» نوشته شده
+      - { no: 6, title: گراف }
+      - { no: 7, title: جبر }
+      - { no: 8, title: نظریه اعداد }
+    courses:
+      - { id: discrete-teach, kind: teaching,   sessions: null, duration_min: null, estimated: true, est_hours: [30, 45] }
+      - { id: discrete-tips,  kind: tips_tests, sessions: null, duration_min: null, estimated: true, est_hours: [30, 40] }
+
+  - id: dsa
+    name_fa: داده‌ساختارها و الگوریتم‌ها
+    name_en: Data Structures & Algorithms
+    group: specialized
+    status: active
+    priority_phase: 2
+    chapters:
+      - { no: 1, title: "تحلیل الگوریتم‌ها (مرتبه زمانی، رشد توابع، آنالیز استهلاکی)" }
+      - { no: 2, title: روابط بازگشتی و تقسیم و غلبه }
+      - { no: 3, title: "داده‌ساختارهای پایه (صف، آرایه، پشته، لیست پیوندی)" }
+      - { no: 4, title: درخت و درخت‌های ویژه }
+      - { no: 5, title: مرتب‌سازی و مرتبه‌های آماری }
+      - { no: 6, title: درهم‌سازی }
+      - { no: 7, title: گراف }
+    courses:
+      - { id: dsa-teach, kind: teaching,   instructor: "?", sessions: null, duration_min: null, estimated: true, est_hours: [45, 60] }
+      - { id: dsa-tips,  kind: tips_tests, instructor: محمد انصاری, platform: parlike, sessions: 34, duration_min: 5757 }  # 95:57
+
+  - id: logic
+    name_fa: مدار منطقی
+    name_en: Logic Circuits
+    group: specialized
+    status: active
+    priority_phase: 2
+    chapters:
+      - { no: 1, title: اعداد و مبناها }
+      - { no: 2, title: جبر بول }
+      - { no: 3, title: مخاطره }
+      - { no: 4, title: مدارهای ترکیبی و تحلیل آن‌ها }
+      - { no: 5, title: مدارهای ترتیبی و تحلیل آن‌ها }
+      - { no: 6, title: "طراحی مدارهای ترتیبی (کاهش حالت، Verilog، VHDL)" }
+    courses:
+      - { id: logic-teach, kind: teaching,   estimated: true, est_hours: [22, 32] }
+      - { id: logic-tips,  kind: tips_tests, estimated: true, est_hours: [22, 32] }
+
+  - id: arch
+    name_fa: معماری کامپیوتر
+    name_en: Computer Architecture
+    group: specialized
+    status: active
+    priority_phase: 3
+    chapters:
+      - { no: 1, title: محاسبات و ممیز شناور }
+      - { no: 2, title: ارزیابی کارایی }
+      - { no: 3, title: زبان انتقال ثبات (RTL) }
+      - { no: 4, title: طراحی کامپیوتر پایه و ALU }
+      - { no: 5, title: خط لوله و پردازش موازی }
+      - { no: 6, title: حافظه }
+      - { no: 7, title: ریزبرنامه‌نویسی }
+      - { no: 8, title: ورودی و خروجی }
+    courses:
+      - { id: arch-teach, kind: teaching,   estimated: true, est_hours: [30, 42] }
+      - { id: arch-tips,  kind: tips_tests, estimated: true, est_hours: [30, 43] }
+
+  - id: toc
+    name_fa: نظریه زبان‌ها و ماشین‌ها
+    name_en: Theory of Computation
+    group: specialized
+    status: active
+    priority_phase: 3
+    notes: "طبق cshub دور اول و حتی دوم مسلط نمی‌شوی؛ دور سوم تسلط کامل. باید ۳ دور در برنامه باشد."
+    chapters:
+      - { no: 1,  title: مفاهیم اولیه }
+      - { no: 2,  title: ماشین‌های متناهی }
+      - { no: 3,  title: زبان‌های منظم و گرامرهای منظم }
+      - { no: 4,  title: خواص زبان‌های منظم }
+      - { no: 5,  title: زبان‌های مستقل از متن }
+      - { no: 6,  title: ساده‌سازی گرامرهای مستقل از متن }
+      - { no: 7,  title: ماشین‌های پشته‌ای }
+      - { no: 8,  title: خواص زبان‌های مستقل از متن }
+      - { no: 9,  title: ماشین تورینگ }
+      - { no: 10, title: محاسبه‌پذیری و زبان‌های نوع صفر و یک }
+    courses:
+      - { id: toc-teach, kind: teaching,   estimated: true, est_hours: [22, 32] }
+      - { id: toc-tips,  kind: tips_tests, estimated: true, est_hours: [22, 32] }
+
+  - id: os
+    name_fa: سیستم‌عامل
+    name_en: Operating Systems
+    group: specialized
+    status: active
+    priority_phase: 4
+    chapters:
+      - { no: 1, title: مفاهیم اولیه }
+      - { no: 2, title: مقدمه‌ای بر سیستم‌های عامل }
+      - { no: 3, title: "فرایندها، زمان‌بندی پردازنده و نخ‌ها" }
+      - { no: 4, title: همگام‌سازی فرایندها }
+      - { no: 5, title: بن‌بست }
+      - { no: 6, title: دیسک و ورودی و خروجی }
+      - { no: 7, title: مدیریت حافظه اصلی }
+      - { no: 8, title: حافظه‌های مجازی }
+    courses:
+      - { id: os-teach, kind: teaching,   instructor: ابوالفضل حقیقت, platform: parlike, sessions: 46, duration_min: 4696 }  # 78:16
+      - { id: os-tips,  kind: tips_tests, instructor: ابوالفضل حقیقت, platform: parlike, sessions: 24, duration_min: 3248 }  # 54:08
+
+  - id: stats
+    name_fa: آمار و احتمال مهندسی
+    name_en: Engineering Probability & Statistics
+    group: math
+    status: active
+    priority_phase: 4
+    chapters:
+      - { no: 1, title: آمار توصیفی }
+      - { no: 2, title: آنالیز ترکیبی و احتمال }
+      - { no: 3, title: متغیرهای تصادفی }
+      - { no: 4, title: متغیرهای تصادفی توأم }
+      - { no: 5, title: توزیع گسسته و پیوسته }
+      - { no: 6, title: برآورد و آزمون }
+    courses:
+      - { id: stats-teach, kind: teaching,   estimated: true, est_hours: [22, 35] }
+      - { id: stats-tips,  kind: tips_tests, estimated: true, est_hours: [23, 35] }
+
+  - id: foundations
+    name_fa: مبانی کامپیوتر و برنامه‌سازی
+    name_en: Programming Fundamentals
+    group: specialized
+    status: active
+    mode: daily_tests_only        # 10 تست در روز، بدون ویدیو
+    chapters:
+      - { no: 1,  title: مفاهیم اولیه }
+      - { no: 2,  title: محاسبات در کامپیوتر (مبناها، مکمل ۲، ممیز شناور) }
+      - { no: 3,  title: آشنایی با الگوریتم و فلوچارت }
+      - { no: 4,  title: مقدمات برنامه‌سازی }
+      - { no: 5,  title: قالب‌بندی ورودی و خروجی }
+      - { no: 6,  title: دستورها }
+      - { no: 7,  title: توابع }
+      - { no: 8,  title: آزمون و خطایابی برنامه }
+      - { no: 9,  title: آرایه‌ها }
+      - { no: 10, title: اشاره‌گرها }
+      - { no: 11, title: کاراکترها و رشته‌ها }
+      - { no: 12, title: ساختارها }
+      - { no: 13, title: "آشنایی با زبان C++" }
+      - { no: 14, title: آشنایی با رده‌ها }
+      - { no: 15, title: پرونده‌ها, optional: true }
+
+  - id: english
+    name_fa: زبان انگلیسی
+    name_en: English (general + CS-specific)
+    group: english
+    status: active
+    mode: daily_20min
+    chapters:
+      - { no: 1, title: لغات عمومی }
+      - { no: 2, title: گرامر }
+      - { no: 3, title: درک مطلب تخصصی رشته کامپیوتر }
+
+  - id: linear_algebra
+    name_fa: جبر خطی
+    name_en: Linear Algebra
+    group: math
+    status: dropped            # تصمیم کاربر در 22 آبان 1405: «کلاً نمی‌خوانم»
+    notes: "جزو آزمون ۱۴۰۶ است ولی کاربر آگاهانه حذف کرده؛ سیستم باید این را به‌عنوان ریسک آگاهانه ثبت و در مرور ماهانه یادآوری کند."
+    chapters:
+      - { no: 1, title: معادلات خطی }
+      - { no: 2, title: جبر ماتریسی }
+      - { no: 3, title: فضای برداری }
+      - { no: 4, title: بردارها و مقادیر ویژه }
+      - { no: 5, title: تعامد و کمترین مربعات }
+      - { no: 6, title: تجزیه مقدار منفرد }
+      - { no: 7, title: تحلیل مؤلفه‌های اصلی }
+      - { no: 8, title: بهینه‌سازی }

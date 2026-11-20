@@ -1,0 +1,57 @@
+/*
+ * THE ASCENT — Design tokens v0.2 "Playful Color-Block" (doc 12 §4).
+ * Colors are stored as space-separated RGB channels so Tailwind can apply alpha: rgb(var(--c-yellow) / .5).
+ * Hex reference is kept in comments. Night = default theme, Cream = light theme.
+ */
+
+:root,
+[data-theme="night"] {
+  color-scheme: dark;
+  --bg: 14 14 16; /* #0E0E10 */
+  --surface-1: 22 22 26; /* #16161A */
+  --surface-2: 30 30 36; /* #1E1E24 */
+  --border: 42 42 50; /* #2A2A32 */
+  --text: 245 242 234; /* #F5F2EA */
+  --text-muted: 154 154 163; /* #9A9AA3 — 6.9:1 on bg */
+  --c-yellow: 242 194 78; /* #F2C24E  Core Quest / XP / CTA */
+  --c-mint: 143 217 208; /* #8FD9D0  next chapter / insight */
+  --c-coral: 232 85 63; /* #E8553F  results / warning / Fog — dark text only (5.2:1) */
+  --c-purple: 110 92 232; /* #6E5CE8  interaction surfaces — white text 4.8:1 (AA, ADR-0017) */
+  --purple-ink: 169 156 255; /* #A99CFF  purple text/links on dark bg — 8:1 */
+  --yellow-ink: 242 194 78; /* accent text on dark surfaces = bright c-yellow (passes on night) */
+  --coral-ink: 232 85 63;
+  --mint-ink: 143 217 208;
+  --lime-ink: 155 210 78;
+  --c-lime: 155 210 78; /* #9BD24E  success */
+  --on-color: 17 17 20; /* #111114  text on color cards */
+  --btn-primary: 17 17 20;
+  --btn-primary-text: 255 255 255;
+  --radius-card: 26px;
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 12px 32px rgb(0 0 0 / 0.35);
+  --focus-ring: 169 156 255;
+}
+
+[data-theme="cream"] {
+  color-scheme: light;
+  --bg: 246 235 213; /* #F6EBD5 */
+  --surface-1: 255 253 248; /* #FFFDF8 */
+  --surface-2: 255 247 230; /* #FFF7E6 */
+  --border: 234 223 200; /* #EADFC8 */
+  --text: 27 26 23; /* #1B1A17 */
+  --text-muted: 99 94 82; /* #635E52 — darkened from #6F6A5C for AA (5.6:1 on bg) */
+  --c-yellow: 245 184 61; /* #F5B83D — dark text 10.6:1 */
+  --c-mint: 143 217 208; /* dark text 9.5:1 */
+  --c-coral: 232 85 63; /* dark text 5.2:1 (AA) — never white small text */
+  --c-purple: 91 76 214; /* #5B4CD6 — white text 6.1:1 (AA, ADR-0017) */
+  --purple-ink: 91 76 214; /* purple text/links on cream — 6:1 */
+  --yellow-ink: 122 96 0; /* #7A6000 dark gold — accent text on cream, 5.9:1 (AA) */
+  --coral-ink: 181 66 49; /* #B54231 dark coral — 5.3:1 (AA) */
+  --mint-ink: 26 107 96; /* #1A6B60 dark teal — 6.2:1 (AA) */
+  --lime-ink: 69 112 26; /* #45701A dark green — 5.7:1 (AA) */
+  --c-lime: 155 210 78; /* dark text 8.7:1 */
+  --on-color: 17 17 20;
+  --btn-primary: 17 17 20;
+  --btn-primary-text: 255 255 255;
+  --shadow-card: 0 10px 30px rgb(120 90 30 / 0.12);
+  --focus-ring: 91 76 214;
+}

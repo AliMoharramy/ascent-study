@@ -1,0 +1,253 @@
+# seed/mock-chapter-budget.yaml
+# بودجه‌بندی ۱۳ آزمون آزمایشی cshub (کنکور ۱۴۰۶) به تفکیک درس و فصل.
+# منبع صفحه: https://cshub.ir/online-simulation-test/ (به‌روزرسانی صفحه: 1405-07-11)
+#  - تعداد سؤال هر درس + زمان: تصویر جدول برنامه زمانی https://cshub.ir/wp-content/uploads/2026/10/photo_2026-10-03_21-14-53.jpg
+#    (هر سطر با «تعداد سؤالات آزمون» جمع‌زده و تطبیق داده شد: همه ۱۳ سطر درست درمی‌آیند).
+#  - فصل‌های تحت پوشش: ۱۳ تصویر «برنامه آزمون آزمایشی شماره n» (چک‌باکس‌ها؛ با تحلیل پیکسلی خوانده و آزمون 1 و 5 چشمی بازبینی شد).
+# ⚠ تصاویر بودجه‌بندی فقط «پوشش فصل» (تیک) را نشان می‌دهند، نه تعداد سؤال هر فصل → per-chapter count = unknown: true.
+#   chapters_covered فهرست تجمعی فصل‌هایی است که در آن آزمون «ممکن است» سؤال داشته باشند.
+# ⚠ اختلاف با seed/mock-exams.yaml: آزمون 12 در جدول فعلی 90 سؤال × 185 دقیقه است (نه 80 × 160)؛ آزمون 4 = 135 دقیقه (مطابق).
+# زبان: در همه آزمون‌ها «به صورت کلی» تست می‌آید (متن تصویر)؛ تفکیک: لغت/گرامر/درک مطلب.
+# subject ids مطابق seed/subjects.yaml؛ english → فصل‌های 1=لغت، 2=گرامر، 3=درک مطلب.
+source:
+  page_url: "https://cshub.ir/online-simulation-test/"
+  schedule_image: "https://cshub.ir/wp-content/uploads/2026/10/photo_2026-10-03_21-14-53.jpg"
+  extracted_jalali: "1405-08-23"
+exams:
+  - no: 1
+    date_jalali: "1405-05-23"
+    questions: 35
+    minutes: 100
+    budget_image: "https://cshub.ir/wp-content/uploads/2026/06/Screenshot-2026-06-19-at-22.33.41-2048x679.png"
+    subjects:
+      english: { questions: 15, by_chapter: { 1: 7, 2: 3, 3: 5 } }
+      linear_algebra: { questions: 0 }
+      stats: { questions: 0 }
+      discrete: { questions: 5, chapters_covered: [1, 2], per_chapter_counts: unknown, unknown: true }
+      foundations: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9], per_chapter_counts: unknown, unknown: true }
+      dsa: { questions: 0 }
+      toc: { questions: 5, chapters_covered: [1, 2, 3, 4], per_chapter_counts: unknown, unknown: true }
+      ai: { questions: 0 }
+      logic: { questions: 5, chapters_covered: [1, 2, 3, 4], per_chapter_counts: unknown, unknown: true }
+      arch: { questions: 0 }
+      os: { questions: 0 }
+  - no: 2
+    date_jalali: "1405-06-20"
+    questions: 35
+    minutes: 100
+    budget_image: "https://cshub.ir/wp-content/uploads/2026/06/Screenshot-2026-06-19-at-22.33.48-2048x679.png"
+    subjects:
+      english: { questions: 15, by_chapter: { 1: 7, 2: 3, 3: 5 } }
+      linear_algebra: { questions: 0 }
+      stats: { questions: 0 }
+      discrete: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      foundations: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], per_chapter_counts: unknown, unknown: true }
+      dsa: { questions: 0 }
+      toc: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      ai: { questions: 0 }
+      logic: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      arch: { questions: 0 }
+      os: { questions: 0 }
+  - no: 3
+    date_jalali: "1405-07-17"
+    questions: 50
+    minutes: 140
+    budget_image: "https://cshub.ir/wp-content/uploads/2026/06/Screenshot-2026-06-19-at-22.34.01-2048x679.png"
+    subjects:
+      english: { questions: 15, by_chapter: { 1: 7, 2: 3, 3: 5 } }
+      linear_algebra: { questions: 0 }
+      stats: { questions: 5, chapters_covered: [1, 2], per_chapter_counts: unknown, unknown: true }
+      discrete: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      foundations: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], per_chapter_counts: unknown, unknown: true }
+      dsa: { questions: 5, chapters_covered: [1, 2, 3], per_chapter_counts: unknown, unknown: true }
+      toc: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], per_chapter_counts: unknown, unknown: true }
+      ai: { questions: 0 }
+      logic: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      arch: { questions: 5, chapters_covered: [1], per_chapter_counts: unknown, unknown: true }
+      os: { questions: 0 }
+  - no: 4
+    date_jalali: "1405-08-22"
+    questions: 50
+    minutes: 135
+    budget_image: "https://cshub.ir/wp-content/uploads/2026/06/Screenshot-2026-06-19-at-22.34.06-2048x679.png"
+    subjects:
+      english: { questions: 15, by_chapter: { 1: 7, 2: 3, 3: 5 } }
+      linear_algebra: { questions: 0 }
+      stats: { questions: 5, chapters_covered: [1, 2, 3, 4], per_chapter_counts: unknown, unknown: true }
+      discrete: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      foundations: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], per_chapter_counts: unknown, unknown: true }
+      dsa: { questions: 5, chapters_covered: [1, 2, 3, 4, 5], per_chapter_counts: unknown, unknown: true }
+      toc: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], per_chapter_counts: unknown, unknown: true }
+      ai: { questions: 0 }
+      logic: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      arch: { questions: 5, chapters_covered: [1, 2, 3, 4], per_chapter_counts: unknown, unknown: true }
+      os: { questions: 0 }
+  - no: 5
+    date_jalali: "1405-09-20"
+    questions: 55
+    minutes: 145
+    budget_image: "https://cshub.ir/wp-content/uploads/2026/06/Screenshot-2026-06-19-at-22.35.25-1-2048x679.png"
+    subjects:
+      english: { questions: 15, by_chapter: { 1: 7, 2: 3, 3: 5 } }
+      linear_algebra: { questions: 0 }
+      stats: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      discrete: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      foundations: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], per_chapter_counts: unknown, unknown: true }
+      dsa: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7], per_chapter_counts: unknown, unknown: true }
+      toc: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], per_chapter_counts: unknown, unknown: true }
+      ai: { questions: 5, chapters_covered: [1, 2, 3, 4], per_chapter_counts: unknown, unknown: true }
+      logic: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      arch: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      os: { questions: 0 }
+  - no: 6
+    date_jalali: "1405-10-18"
+    questions: 65
+    minutes: 170
+    budget_image: "https://cshub.ir/wp-content/uploads/2026/06/Screenshot-2026-06-19-at-22.45.16-2048x679.png"
+    subjects:
+      english: { questions: 15, by_chapter: { 1: 7, 2: 3, 3: 5 } }
+      linear_algebra: { questions: 5, chapters_covered: [1, 2], per_chapter_counts: unknown, unknown: true }
+      stats: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      discrete: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      foundations: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], per_chapter_counts: unknown, unknown: true }
+      dsa: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7], per_chapter_counts: unknown, unknown: true }
+      toc: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], per_chapter_counts: unknown, unknown: true }
+      ai: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      logic: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      arch: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      os: { questions: 5, chapters_covered: [1, 2, 3], per_chapter_counts: unknown, unknown: true }
+  - no: 7
+    date_jalali: "1405-11-16"
+    questions: 65
+    minutes: 160
+    budget_image: "https://cshub.ir/wp-content/uploads/2026/06/Screenshot-2026-06-19-at-22.45.58-2048x679.png"
+    subjects:
+      english: { questions: 15, by_chapter: { 1: 7, 2: 3, 3: 5 } }
+      linear_algebra: { questions: 5, chapters_covered: [1, 2, 3, 4], per_chapter_counts: unknown, unknown: true }
+      stats: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      discrete: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      foundations: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], per_chapter_counts: unknown, unknown: true }
+      dsa: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7], per_chapter_counts: unknown, unknown: true }
+      toc: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], per_chapter_counts: unknown, unknown: true }
+      ai: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], per_chapter_counts: unknown, unknown: true }
+      logic: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      arch: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      os: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+  - no: 8
+    date_jalali: "1405-12-07"
+    questions: 65
+    minutes: 150
+    budget_image: "https://cshub.ir/wp-content/uploads/2026/06/Screenshot-2026-06-19-at-22.47.52-2048x679.png"
+    subjects:
+      english: { questions: 15, by_chapter: { 1: 7, 2: 3, 3: 5 } }
+      linear_algebra: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      stats: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      discrete: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      foundations: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], per_chapter_counts: unknown, unknown: true }
+      dsa: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7], per_chapter_counts: unknown, unknown: true }
+      toc: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], per_chapter_counts: unknown, unknown: true }
+      ai: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], per_chapter_counts: unknown, unknown: true }
+      logic: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      arch: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      os: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+  - no: 9
+    date_jalali: "1405-12-21"
+    questions: 90
+    minutes: 185
+    budget_image: "https://cshub.ir/wp-content/uploads/2026/06/Screenshot-2026-06-19-at-22.48.33-2048x679.png"
+    subjects:
+      english: { questions: 25, by_chapter: { 1: 7, 2: 3, 3: 15 } }
+      linear_algebra: { questions: 7, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      stats: { questions: 7, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      discrete: { questions: 6, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      foundations: { questions: 6, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], per_chapter_counts: unknown, unknown: true }
+      dsa: { questions: 7, chapters_covered: [1, 2, 3, 4, 5, 6, 7], per_chapter_counts: unknown, unknown: true }
+      toc: { questions: 6, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], per_chapter_counts: unknown, unknown: true }
+      ai: { questions: 7, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], per_chapter_counts: unknown, unknown: true }
+      logic: { questions: 6, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      arch: { questions: 6, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      os: { questions: 7, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+  - no: 10
+    date_jalali: "1406-01-06"
+    questions: 115
+    minutes: 250
+    budget_image: "https://cshub.ir/wp-content/uploads/2026/06/Screenshot-2026-06-19-at-22.48.41-2048x679.png"
+    subjects:
+      english: { questions: 25, by_chapter: { 1: 7, 2: 3, 3: 15 } }
+      linear_algebra: { questions: 7, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      stats: { questions: 6, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      discrete: { questions: 7, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      foundations: { questions: 10, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], per_chapter_counts: unknown, unknown: true }
+      dsa: { questions: 10, chapters_covered: [1, 2, 3, 4, 5, 6, 7], per_chapter_counts: unknown, unknown: true }
+      toc: { questions: 10, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], per_chapter_counts: unknown, unknown: true }
+      ai: { questions: 10, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], per_chapter_counts: unknown, unknown: true }
+      logic: { questions: 10, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      arch: { questions: 10, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      os: { questions: 10, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+  - no: 11
+    date_jalali: "1406-01-19/20"
+    questions: 80
+    minutes: 160
+    budget_image: "https://cshub.ir/wp-content/uploads/2026/06/Screenshot-2026-06-19-at-22.48.58-2048x679.png"
+    subjects:
+      english: { questions: 25, by_chapter: { 1: 7, 2: 3, 3: 15 } }
+      linear_algebra: { questions: 6, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      stats: { questions: 7, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      discrete: { questions: 7, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      foundations: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], per_chapter_counts: unknown, unknown: true }
+      dsa: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7], per_chapter_counts: unknown, unknown: true }
+      toc: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], per_chapter_counts: unknown, unknown: true }
+      ai: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], per_chapter_counts: unknown, unknown: true }
+      logic: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      arch: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      os: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+  - no: 12
+    date_jalali: "1406-02-02/03"
+    questions: 90
+    minutes: 185
+    budget_image: "https://cshub.ir/wp-content/uploads/2026/06/Screenshot-2026-06-19-at-22.49.04-2048x679.png"
+    note: "seed/mock-exams.yaml این آزمون را 80×160 ثبت کرده؛ جدول به‌روز cshub: 90 سؤال × 185 دقیقه"
+    subjects:
+      english: { questions: 25, by_chapter: { 1: 7, 2: 3, 3: 15 } }
+      linear_algebra: { questions: 7, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      stats: { questions: 6, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      discrete: { questions: 7, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      foundations: { questions: 6, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], per_chapter_counts: unknown, unknown: true }
+      dsa: { questions: 8, chapters_covered: [1, 2, 3, 4, 5, 6, 7], per_chapter_counts: unknown, unknown: true }
+      toc: { questions: 6, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], per_chapter_counts: unknown, unknown: true }
+      ai: { questions: 7, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], per_chapter_counts: unknown, unknown: true }
+      logic: { questions: 6, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      arch: { questions: 6, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      os: { questions: 6, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+  - no: 13
+    date_jalali: "1406-02-09/10"
+    questions: 80
+    minutes: 160
+    budget_image: "https://cshub.ir/wp-content/uploads/2026/06/Screenshot-2026-06-19-at-22.49.10-2048x679.png"
+    subjects:
+      english: { questions: 25, by_chapter: { 1: 7, 2: 3, 3: 15 } }
+      linear_algebra: { questions: 7, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      stats: { questions: 7, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      discrete: { questions: 6, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      foundations: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], per_chapter_counts: unknown, unknown: true }
+      dsa: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7], per_chapter_counts: unknown, unknown: true }
+      toc: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], per_chapter_counts: unknown, unknown: true }
+      ai: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], per_chapter_counts: unknown, unknown: true }
+      logic: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6], per_chapter_counts: unknown, unknown: true }
+      arch: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+      os: { questions: 5, chapters_covered: [1, 2, 3, 4, 5, 6, 7, 8], per_chapter_counts: unknown, unknown: true }
+# جمع‌بندی برای کاربر (جبر خطی dropped): سؤال‌های «نزدهٔ عمدی» = ستون linear_algebra هر آزمون.
+user_view:
+  - { no: 1, total: 35, linear_algebra_skipped: 0, attemptable: 35, attemptable_share: 1.0 }
+  - { no: 2, total: 35, linear_algebra_skipped: 0, attemptable: 35, attemptable_share: 1.0 }
+  - { no: 3, total: 50, linear_algebra_skipped: 0, attemptable: 50, attemptable_share: 1.0 }
+  - { no: 4, total: 50, linear_algebra_skipped: 0, attemptable: 50, attemptable_share: 1.0 }
+  - { no: 5, total: 55, linear_algebra_skipped: 0, attemptable: 55, attemptable_share: 1.0 }
+  - { no: 6, total: 65, linear_algebra_skipped: 5, attemptable: 60, attemptable_share: 0.923 }
+  - { no: 7, total: 65, linear_algebra_skipped: 5, attemptable: 60, attemptable_share: 0.923 }
+  - { no: 8, total: 65, linear_algebra_skipped: 5, attemptable: 60, attemptable_share: 0.923 }
+  - { no: 9, total: 90, linear_algebra_skipped: 7, attemptable: 83, attemptable_share: 0.922 }
+  - { no: 10, total: 115, linear_algebra_skipped: 7, attemptable: 108, attemptable_share: 0.939 }
+  - { no: 11, total: 80, linear_algebra_skipped: 6, attemptable: 74, attemptable_share: 0.925 }
+  - { no: 12, total: 90, linear_algebra_skipped: 7, attemptable: 83, attemptable_share: 0.922 }
+  - { no: 13, total: 80, linear_algebra_skipped: 7, attemptable: 73, attemptable_share: 0.912 }

@@ -1,0 +1,161 @@
+# seed/chapter-weights.yaml
+# وزن مورد انتظار سؤال هر فصل (Eq) برای موتور Triage (docs/03 §6).
+# منبع: جدول‌های «تعداد تست مطرح‌شده از هر فصل» در https://cshub.ir/computer-konkur-sections/
+#   (کنکورهای 1397 تا 1405؛ تصویرها 23 آبان 1405 خوانده و با جمع سطر/ستون کنترل شدند). گزارش: docs/research/T-DATA-07-chapter-weights.md
+# eq_weight = سهم نرمال‌شده‌ی فصل در کل سؤالات همان درس (جمع eq_weight هر درس ≈ 1). بازه: 1397-1405. eq_weight_recent: فقط 1400-1405.
+# raw_q = جمع سؤال‌های نگاشت‌شده به این فصل (اعشار = سؤال چندفصلی که cshub تقسیم کرده یا تقسیم تخمینی من).
+# estimated:true = تقسیم یک فصل cshub بین چند فصل پروژه، تخمین من است. ambiguous:true = تطابق سرفصل cshub با subjects.yaml قطعی نیست.
+# proxy:true = از درس مشابه در کنکور دیگر (جبر خطی ← «مبانی ماتریس و جبر خطی» کنکور علوم کامپیوتر).
+# ⚠ کنکور ۱۴۰۶ نخستین سال ساختار جدید است؛ گذشته فقط برآوردی از آینده است.
+meta:
+  source_url: "https://cshub.ir/computer-konkur-sections/"
+  years: [1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405]
+  recent_years: [1400, 1401, 1402, 1403, 1404, 1405]
+  extracted_jalali: "1405-08-23"
+  normalization: per_subject_sum_to_1
+  stars: "volume/difficulty = ستاره‌های حجم و سختی جدول cshub (1..3)؛ فقط وقتی فصل پروژه دقیقاً یک فصل cshub است"
+subjects:
+  ai:
+    source_image: "https://cshub.ir/wp-content/uploads/2026/07/تعداد-تست-هوش-مصنوعی.png"
+    old_exam_questions_per_year: {1397: 13, 1398: 7, 1399: 12, 1400: 8, 1401: 8, 1402: 8, 1403: 8, 1404: 8, 1405: 8}
+    chapters:
+      - { no: 1, eq_weight: 0.013, eq_weight_recent: 0.021, raw_q: 1.0, raw_q_recent: 1.0, from_cshub_ch: [1], volume: 1, difficulty: 1 }
+      - { no: 2, eq_weight: 0.025, eq_weight_recent: 0.021, raw_q: 2.0, raw_q_recent: 1.0, from_cshub_ch: [2], volume: 1, difficulty: 1 }
+      - { no: 3, eq_weight: 0.275, eq_weight_recent: 0.292, raw_q: 22.0, raw_q_recent: 14.0, from_cshub_ch: [3], volume: 3, difficulty: 2 }
+      - { no: 4, eq_weight: 0.1, eq_weight_recent: 0.146, raw_q: 8.0, raw_q_recent: 7.0, from_cshub_ch: [4], volume: 2, difficulty: 2 }
+      - { no: 5, eq_weight: 0.1, eq_weight_recent: 0.104, raw_q: 8.0, raw_q_recent: 5.0, from_cshub_ch: [5], volume: 1, difficulty: 2 }
+      - { no: 6, eq_weight: 0.15, eq_weight_recent: 0.188, raw_q: 12.0, raw_q_recent: 9.0, from_cshub_ch: [6], volume: 2, difficulty: 2 }
+      - { no: 7, eq_weight: 0.15, eq_weight_recent: 0.062, raw_q: 12.0, raw_q_recent: 3.0, from_cshub_ch: [7], volume: 3, difficulty: 3 }
+      - { no: 8, eq_weight: 0.0, eq_weight_recent: 0.0, raw_q: 0.0, raw_q_recent: 0.0, from_cshub_ch: [8], volume: 1, difficulty: 2 }
+      - { no: 9, eq_weight: 0.062, eq_weight_recent: 0.021, raw_q: 5.0, raw_q_recent: 1.0, from_cshub_ch: [9], volume: 3, difficulty: 3 }
+      - { no: 10, eq_weight: 0.025, eq_weight_recent: 0.0, raw_q: 2.0, raw_q_recent: 0.0, from_cshub_ch: [10], volume: 2, difficulty: 1 }
+      - { no: 11, eq_weight: 0.013, eq_weight_recent: 0.0, raw_q: 1.0, raw_q_recent: 0.0, from_cshub_ch: [11], volume: 1, difficulty: 2 }
+      - { no: 12, eq_weight: 0.025, eq_weight_recent: 0.042, raw_q: 2.0, raw_q_recent: 2.0, from_cshub_ch: [12], volume: 3, difficulty: 2 }
+      - { no: 13, eq_weight: 0.05, eq_weight_recent: 0.083, raw_q: 4.0, raw_q_recent: 4.0, from_cshub_ch: [13, 14], ambiguous: true }
+      - { no: 14, eq_weight: 0.013, eq_weight_recent: 0.021, raw_q: 1.0, raw_q_recent: 1.0, from_cshub_ch: [15], volume: 2, difficulty: 2 }
+  discrete:
+    source_image: "https://cshub.ir/wp-content/uploads/2026/07/تعداد-تست-ریاضیات-گسسته.png"
+    old_exam_questions_per_year: {1397: 4, 1398: 4, 1399: 5, 1400: 7, 1401: 7, 1402: 6, 1403: 6, 1404: 6, 1405: 6}
+    chapters:
+      - { no: 1, eq_weight: 0.098, eq_weight_recent: 0.105, raw_q: 5.0, raw_q_recent: 4.0, from_cshub_ch: [1], volume: 2, difficulty: 2 }
+      - { no: 2, eq_weight: 0.314, eq_weight_recent: 0.368, raw_q: 16.0, raw_q_recent: 14.0, from_cshub_ch: [2], volume: 3, difficulty: 3 }
+      - { no: 3, eq_weight: 0.216, eq_weight_recent: 0.211, raw_q: 11.0, raw_q_recent: 8.0, from_cshub_ch: [3], volume: 2, difficulty: 2 }
+      - { no: 4, eq_weight: 0.196, eq_weight_recent: 0.132, raw_q: 10.0, raw_q_recent: 5.0, from_cshub_ch: [4], volume: 1, difficulty: 2 }
+      - { no: 5, eq_weight: 0.02, eq_weight_recent: 0.026, raw_q: 1.0, raw_q_recent: 1.0, from_cshub_ch: [5], volume: 1, difficulty: 2 }
+      - { no: 6, eq_weight: 0.098, eq_weight_recent: 0.105, raw_q: 5.0, raw_q_recent: 4.0, from_cshub_ch: [6], volume: 3, difficulty: 2 }
+      - { no: 7, eq_weight: 0.0, eq_weight_recent: 0.0, raw_q: 0.0, raw_q_recent: 0.0, from_cshub_ch: [7], volume: 1, difficulty: 3 }
+      - { no: 8, eq_weight: 0.059, eq_weight_recent: 0.053, raw_q: 3.0, raw_q_recent: 2.0, from_cshub_ch: [8], volume: 1, difficulty: 2 }
+  dsa:
+    source_image: "https://cshub.ir/wp-content/uploads/2026/10/تعداد-تست-داده-ساختارها-و-الگوریتم.png"
+    old_exam_questions_per_year: {1397: 10, 1398: 10, 1399: 14, 1400: 11.99, 1401: 12, 1402: 11.99, 1403: 11.99, 1404: 11.99, 1405: 12.0}
+    excluded_cshub_chapters: [7, 9, 10, 11, 12]   # پویا، NP، شار، هندسه، پسگرد — طبق cshub در سرفصل ۱۴۰۶ نیستند
+    note: "فصل 6 cshub (حریصانه+تقسیم‌وغلبه): حریصانه حذف شده → 50% به فصل 2 (تخمین). فصل 5 cshub بین مرتب‌سازی (75%) و درهم‌سازی (25%) تقسیم شد (تخمین). گراف: «نیمی حذف شد» → 50% (تخمین)."
+    chapters:
+      - { no: 1, eq_weight: 0.078, eq_weight_recent: 0.115, raw_q: 6.0, raw_q_recent: 6.0, from_cshub_ch: [1], volume: 1, difficulty: 1 }
+      - { no: 2, eq_weight: 0.202, eq_weight_recent: 0.192, raw_q: 15.57, raw_q_recent: 10.07, from_cshub_ch: [2, 6x0.5], estimated: true }
+      - { no: 3, eq_weight: 0.052, eq_weight_recent: 0.057, raw_q: 4.0, raw_q_recent: 3.0, from_cshub_ch: [3], volume: 2, difficulty: 1 }
+      - { no: 4, eq_weight: 0.121, eq_weight_recent: 0.121, raw_q: 9.33, raw_q_recent: 6.33, from_cshub_ch: [4], volume: 3, difficulty: 2 }
+      - { no: 5, eq_weight: 0.338, eq_weight_recent: 0.324, raw_q: 26.0, raw_q_recent: 17.0, from_cshub_ch: [5x0.75], estimated: true }
+      - { no: 6, eq_weight: 0.113, eq_weight_recent: 0.108, raw_q: 8.66, raw_q_recent: 5.67, from_cshub_ch: [5x0.25], estimated: true }
+      - { no: 7, eq_weight: 0.095, eq_weight_recent: 0.083, raw_q: 7.33, raw_q_recent: 4.33, from_cshub_ch: [8x0.5], estimated: true }
+  logic:
+    source_image: "https://cshub.ir/wp-content/uploads/2026/07/تعداد-تست-مدار-منطقی.png"
+    old_exam_questions_per_year: {1397: 5, 1398: 5, 1399: 12, 1400: 7, 1401: 7, 1402: 7, 1403: 7, 1404: 7, 1405: 7}
+    note: "cshub 8 فصل دارد، subjects.yaml 6 فصل. فصل 8 cshub (ASM/RTL/مخاطره/وریلاگ) 50/50 بین «مخاطره» و «طراحی ترتیبی» تقسیم شد (تخمین)."
+    chapters:
+      - { no: 1, eq_weight: 0.016, eq_weight_recent: 0.0, raw_q: 1.0, raw_q_recent: 0.0, from_cshub_ch: [1], volume: 1, difficulty: 1 }
+      - { no: 2, eq_weight: 0.172, eq_weight_recent: 0.143, raw_q: 11.0, raw_q_recent: 6.0, from_cshub_ch: [2, 3] }
+      - { no: 3, eq_weight: 0.07, eq_weight_recent: 0.083, raw_q: 4.5, raw_q_recent: 3.5, from_cshub_ch: [8x0.5], estimated: true }
+      - { no: 4, eq_weight: 0.188, eq_weight_recent: 0.214, raw_q: 12.0, raw_q_recent: 9.0, from_cshub_ch: [4, 7], ambiguous: true }
+      - { no: 5, eq_weight: 0.484, eq_weight_recent: 0.476, raw_q: 31.0, raw_q_recent: 20.0, from_cshub_ch: [5, 6], ambiguous: true }
+      - { no: 6, eq_weight: 0.07, eq_weight_recent: 0.083, raw_q: 4.5, raw_q_recent: 3.5, from_cshub_ch: [8x0.5], estimated: true }
+  arch:
+    source_image: "https://cshub.ir/wp-content/uploads/2026/07/تعداد-تست-معماری-کامپیوتر.png"
+    old_exam_questions_per_year: {1397: 4, 1398: 5, 1399: 12, 1400: 7, 1401: 7, 1402: 7, 1403: 7, 1404: 7, 1405: 7}
+    data_note: "ستون «مجموع» فصل 9 (IO) در تصویر 0 است ولی خانهٔ 1405 برابر 1 و جمع ستون 1405 فقط با آن = 7 می‌شود → 1 منظور شد. فصل «مفاهیم اولیه» cshub (1 سؤال) به فصل 1 پروژه نسبت داده شد (ambiguous)."
+    chapters:
+      - { no: 1, eq_weight: 0.349, eq_weight_recent: 0.31, raw_q: 22.0, raw_q_recent: 13.0, from_cshub_ch: [1, 2], ambiguous: true }
+      - { no: 2, eq_weight: 0.095, eq_weight_recent: 0.119, raw_q: 6.0, raw_q_recent: 5.0, from_cshub_ch: [3], volume: 1, difficulty: 2 }
+      - { no: 3, eq_weight: 0.111, eq_weight_recent: 0.119, raw_q: 7.0, raw_q_recent: 5.0, from_cshub_ch: [4], volume: 2, difficulty: 1 }
+      - { no: 4, eq_weight: 0.095, eq_weight_recent: 0.071, raw_q: 6.0, raw_q_recent: 3.0, from_cshub_ch: [5], volume: 2, difficulty: 3 }
+      - { no: 5, eq_weight: 0.127, eq_weight_recent: 0.143, raw_q: 8.0, raw_q_recent: 6.0, from_cshub_ch: [6], volume: 2, difficulty: 2 }
+      - { no: 6, eq_weight: 0.175, eq_weight_recent: 0.19, raw_q: 11.0, raw_q_recent: 8.0, from_cshub_ch: [7], volume: 3, difficulty: 3 }
+      - { no: 7, eq_weight: 0.032, eq_weight_recent: 0.024, raw_q: 2.0, raw_q_recent: 1.0, from_cshub_ch: [8], volume: 1, difficulty: 2 }
+      - { no: 8, eq_weight: 0.016, eq_weight_recent: 0.024, raw_q: 1.0, raw_q_recent: 1.0, from_cshub_ch: [9], volume: 1, difficulty: 1 }
+  toc:
+    source_image: "https://cshub.ir/wp-content/uploads/2026/07/تعداد-تست-نظریه-زبان‌ها-و-ماشین‌ها.png"
+    old_exam_questions_per_year: {1397: 4, 1398: 4, 1399: 10.2, 1400: 5.0, 1401: 5, 1402: 5, 1403: 5, 1404: 5.0, 1405: 5.0}
+    note: "اعداد اعشاری در خود جدول cshub آمده‌اند (سؤال‌های چندفصلی)."
+    chapters:
+      - { no: 1, eq_weight: 0.11, eq_weight_recent: 0.0, raw_q: 5.3, raw_q_recent: 0.0, from_cshub_ch: [1], volume: 3, difficulty: 3 }
+      - { no: 2, eq_weight: 0.188, eq_weight_recent: 0.192, raw_q: 9.05, raw_q_recent: 5.75, from_cshub_ch: [2], volume: 3, difficulty: 2 }
+      - { no: 3, eq_weight: 0.127, eq_weight_recent: 0.117, raw_q: 6.1, raw_q_recent: 3.5, from_cshub_ch: [3], volume: 2, difficulty: 3 }
+      - { no: 4, eq_weight: 0.005, eq_weight_recent: 0.008, raw_q: 0.25, raw_q_recent: 0.25, from_cshub_ch: [4], volume: 1, difficulty: 1 }
+      - { no: 5, eq_weight: 0.207, eq_weight_recent: 0.233, raw_q: 10.0, raw_q_recent: 7.0, from_cshub_ch: [5], volume: 1, difficulty: 2 }
+      - { no: 6, eq_weight: 0.021, eq_weight_recent: 0.033, raw_q: 1.0, raw_q_recent: 1.0, from_cshub_ch: [6], volume: 2, difficulty: 1 }
+      - { no: 7, eq_weight: 0.041, eq_weight_recent: 0.067, raw_q: 2.0, raw_q_recent: 2.0, from_cshub_ch: [7], volume: 2, difficulty: 2 }
+      - { no: 8, eq_weight: 0.083, eq_weight_recent: 0.1, raw_q: 4.0, raw_q_recent: 3.0, from_cshub_ch: [8], volume: 1, difficulty: 1 }
+      - { no: 9, eq_weight: 0.041, eq_weight_recent: 0.067, raw_q: 2.0, raw_q_recent: 2.0, from_cshub_ch: [9], volume: 3, difficulty: 3 }
+      - { no: 10, eq_weight: 0.176, eq_weight_recent: 0.183, raw_q: 8.5, raw_q_recent: 5.5, from_cshub_ch: [10], volume: 2, difficulty: 1 }
+  os:
+    source_image: "https://cshub.ir/wp-content/uploads/2026/07/تعداد-تست-سیستم-عامل.png"
+    old_exam_questions_per_year: {1397: 3, 1398: 3, 1399: 10, 1400: 7, 1401: 7, 1402: 7, 1403: 7, 1404: 7, 1405: 7}
+    chapters:
+      - { no: 1, eq_weight: 0.052, eq_weight_recent: 0.071, raw_q: 3.0, raw_q_recent: 3.0, from_cshub_ch: [1], volume: 1, difficulty: 1 }
+      - { no: 2, eq_weight: 0.052, eq_weight_recent: 0.071, raw_q: 3.0, raw_q_recent: 3.0, from_cshub_ch: [2], volume: 2, difficulty: 2 }
+      - { no: 3, eq_weight: 0.31, eq_weight_recent: 0.357, raw_q: 18.0, raw_q_recent: 15.0, from_cshub_ch: [3], volume: 3, difficulty: 3 }
+      - { no: 4, eq_weight: 0.155, eq_weight_recent: 0.143, raw_q: 9.0, raw_q_recent: 6.0, from_cshub_ch: [4], volume: 3, difficulty: 3 }
+      - { no: 5, eq_weight: 0.103, eq_weight_recent: 0.095, raw_q: 6.0, raw_q_recent: 4.0, from_cshub_ch: [5], volume: 2, difficulty: 2 }
+      - { no: 6, eq_weight: 0.052, eq_weight_recent: 0.048, raw_q: 3.0, raw_q_recent: 2.0, from_cshub_ch: [6], volume: 1, difficulty: 1 }
+      - { no: 7, eq_weight: 0.069, eq_weight_recent: 0.024, raw_q: 4.0, raw_q_recent: 1.0, from_cshub_ch: [7], volume: 1, difficulty: 1 }
+      - { no: 8, eq_weight: 0.207, eq_weight_recent: 0.19, raw_q: 12.0, raw_q_recent: 8.0, from_cshub_ch: [8], volume: 3, difficulty: 3 }
+  stats:
+    source_image: "https://cshub.ir/wp-content/uploads/2026/07/تعداد-تست-آمار-و-احتمال-مهندسی.png"
+    old_exam_questions_per_year: {1397: 4, 1398: 4, 1399: 5, 1400: 7, 1401: 7, 1402: 7, 1403: 7, 1404: 7, 1405: 7}
+    chapters:
+      - { no: 1, eq_weight: 0.091, eq_weight_recent: 0.095, raw_q: 5.0, raw_q_recent: 4.0, from_cshub_ch: [1], volume: 1, difficulty: 1 }
+      - { no: 2, eq_weight: 0.273, eq_weight_recent: 0.333, raw_q: 15.0, raw_q_recent: 14.0, from_cshub_ch: [2], volume: 2, difficulty: 2 }
+      - { no: 3, eq_weight: 0.164, eq_weight_recent: 0.143, raw_q: 9.0, raw_q_recent: 6.0, from_cshub_ch: [3], volume: 3, difficulty: 1 }
+      - { no: 4, eq_weight: 0.109, eq_weight_recent: 0.119, raw_q: 6.0, raw_q_recent: 5.0, from_cshub_ch: [4], volume: 2, difficulty: 1 }
+      - { no: 5, eq_weight: 0.145, eq_weight_recent: 0.095, raw_q: 8.0, raw_q_recent: 4.0, from_cshub_ch: [5], volume: 1, difficulty: 2 }
+      - { no: 6, eq_weight: 0.218, eq_weight_recent: 0.214, raw_q: 12.0, raw_q_recent: 9.0, from_cshub_ch: [6, 7], ambiguous: true }
+  linear_algebra:
+    source_image: "https://cshub.ir/wp-content/uploads/2026/07/تعداد-تست-مبانی-ماتریس-و-جبر-خطی.png"
+    old_exam_questions_per_year: {1397: 5, 1398: 5, 1399: 5, 1400: 5, 1401: 5, 1402: 5, 1403: 5, 1404: 5.0, 1405: 5}
+    status_note: "proxy از کنکور علوم کامپیوتر؛ کاربر این درس را نمی‌خواند (dropped). فصل‌های 6..8 subjects.yaml (SVD/PCA/بهینه‌سازی) در جدول proxy معادل ندارند."
+    data_note: "جمع خانه‌های سال برای فصل 4 = 7.5 و فصل 6 = 12.5؛ ستون «مجموع» تصویر 7 و 12 نوشته. جمع سال‌ها به کار رفت."
+    chapters:
+      - { no: 1, eq_weight: 0.022, eq_weight_recent: 0.0, raw_q: 1.0, raw_q_recent: 0.0, from_cshub_ch: [1], volume: 1, difficulty: 1, proxy: true }
+      - { no: 2, eq_weight: 0.178, eq_weight_recent: 0.133, raw_q: 8.0, raw_q_recent: 4.0, from_cshub_ch: [2, 3], ambiguous: true, proxy: true }
+      - { no: 3, eq_weight: 0.444, eq_weight_recent: 0.5, raw_q: 20.0, raw_q_recent: 15.0, from_cshub_ch: [4, 6], ambiguous: true, proxy: true }
+      - { no: 4, eq_weight: 0.356, eq_weight_recent: 0.367, raw_q: 16.0, raw_q_recent: 11.0, from_cshub_ch: [7], volume: 2, difficulty: 3, proxy: true }
+      - { no: 5, eq_weight: 0.0, eq_weight_recent: 0.0, raw_q: 0.0, raw_q_recent: 0.0, from_cshub_ch: [5], volume: 1, difficulty: 2, proxy: true }
+      - { no: 6, eq_weight: 0.0, eq_weight_recent: 0.0, raw_q: 0.0, raw_q_recent: 0.0, from_cshub_ch: [], no_source: true }
+      - { no: 7, eq_weight: 0.0, eq_weight_recent: 0.0, raw_q: 0.0, raw_q_recent: 0.0, from_cshub_ch: [], no_source: true }
+      - { no: 8, eq_weight: 0.0, eq_weight_recent: 0.0, raw_q: 0.0, raw_q_recent: 0.0, from_cshub_ch: [], no_source: true }
+  foundations:
+    note: "درس جدید ۱۴۰۶؛ سابقه ندارد (cshub: هنوز بودجه‌بندی معتبری وجود ندارد). وزن یکسان روی ۱۴ فصل غیراختیاری = تخمین محض."
+    source_url: "https://cshub.ir/computer-konkur-sections/"
+    chapters:
+      - { no: 1, eq_weight: 0.071, estimated: true }
+      - { no: 2, eq_weight: 0.071, estimated: true }
+      - { no: 3, eq_weight: 0.071, estimated: true }
+      - { no: 4, eq_weight: 0.071, estimated: true }
+      - { no: 5, eq_weight: 0.071, estimated: true }
+      - { no: 6, eq_weight: 0.071, estimated: true }
+      - { no: 7, eq_weight: 0.071, estimated: true }
+      - { no: 8, eq_weight: 0.071, estimated: true }
+      - { no: 9, eq_weight: 0.071, estimated: true }
+      - { no: 10, eq_weight: 0.071, estimated: true }
+      - { no: 11, eq_weight: 0.071, estimated: true }
+      - { no: 12, eq_weight: 0.071, estimated: true }
+      - { no: 13, eq_weight: 0.071, estimated: true }
+      - { no: 14, eq_weight: 0.071, estimated: true }
+      - { no: 15, eq_weight: 0.0, estimated: true, note: "اختیاری در subjects.yaml؛ ولی آزمون‌های آزمایشی cshub از آزمون 2 به بعد آن را پوشش می‌دهند" }
+  english:
+    note: "بودجه‌بندی فصل‌به‌فصل منتشر نشده. ترکیب از آزمون‌های جامع آزمایشی cshub (9 تا 13): لغت 7، گرامر 3، درک مطلب 15 از 25 — ترکیب آزمون آزمایشی است نه کنکور واقعی."
+    source_url: "https://cshub.ir/online-simulation-test/"
+    chapters:
+      - { no: 1, eq_weight: 0.28, estimated: true }   # لغت 7/25
+      - { no: 2, eq_weight: 0.12, estimated: true }   # گرامر 3/25
+      - { no: 3, eq_weight: 0.60, estimated: true }   # درک مطلب 15/25

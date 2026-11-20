@@ -1,0 +1,23 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Major upgrades (TypeScript, ESLint, Next, ...) are migrations: done deliberately, one at a time, not via bot PRs.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: monthly }
+    ignore:
+      # Node is pinned to the 22.x LTS line (engines, CI, Dockerfile); majors are upgraded deliberately.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]

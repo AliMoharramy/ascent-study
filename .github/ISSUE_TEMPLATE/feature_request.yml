@@ -1,0 +1,25 @@
+name: Feature request
+description: Suggest an improvement or a new capability
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+    validations: { required: true }
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposed solution
+    validations: { required: true }
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This fits a single-user, self-hosted study tool (multi-user features are out of scope).
+        - label: I am willing to help build or test it.

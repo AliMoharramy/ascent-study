@@ -1,0 +1,33 @@
+name: Migrate production
+
+# Manual only. Migrations never run during build, preview deploys or Function cold starts.
+# Needs a GitHub Environment named "production" with required reviewers and a secret DIRECT_DATABASE_URL
+# (the DIRECT, non-pooled connection string). The secret is only ever read by this job.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "migrate" after taking a fresh backup (npm run backup)'
+        required: true
+
+concurrency:
+  group: production-migrate
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'migrate' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Apply pending migrations (advisory-locked, checksum-verified)
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: npm run db:migrate

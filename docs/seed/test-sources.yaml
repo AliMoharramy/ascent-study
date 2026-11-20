@@ -1,0 +1,137 @@
+# seed/test-sources.yaml
+# منبع تست هر درس — issue #13 / Q01. گزارش: docs/research/Q01-test-bank-sources.md
+# دادهٔ واقعی از داشبورد test-cshub.ir کاربر (استخراج 1405-08-24).
+# kind: cshub_bank | nokte_test_video | past_exams | book
+# purchased: true = کاربر در پلتفرم فعال کرده است («فعال شده»)؛ false = «انتخاب» (خریداری نشده).
+# approx_count = جمع «تست کنکوری» + «تست تألیفی» همان ردیف. count_detail تفکیک خام است.
+# قاعده: هر عدد یا از داشبورد کاربر است یا در note به‌صورت تخمین/محاسبه علامت خورده.
+
+meta:
+  platform: "test-cshub.ir"
+  extracted_jalali: "1405-08-24"
+  total_active_subjects: 9964 # جمع approx_count ردیف‌های purchased برای ۱۰ درس active (محاسبه)
+  note: "سقف خام است، نه تست قابل‌استفاده؛ فیلتر سرفصل ۱۴۰۶ در سطح فصل و توسط Triage انجام می‌شود."
+
+sources:
+  - id: cshub-english
+    subject_id: english
+    title: "بانک تست cshub — زبان انگلیسی"
+    kind: cshub_bank
+    purchased: true
+    approx_count: 1638
+    count_detail: "1589 تست کنکوری + 49 تست تألیفی"
+    source_url: "https://test-cshub.ir/"
+    note: "پوشش: علوم کامپیوتر، آی‌تی، مهندسی کامپیوتر. جایگزین کتاب تست زبان (توصیهٔ cshub)."
+
+  - id: cshub-discrete
+    subject_id: discrete
+    title: "بانک تست cshub — ریاضیات گسسته"
+    kind: cshub_bank
+    purchased: true
+    approx_count: 1516
+    count_detail: "915 تست کنکوری + 601 تست تألیفی"
+    source_url: "https://test-cshub.ir/"
+    note: "پوشش: علوم کامپیوتر، آی‌تی، مهندسی کامپیوتر. بخشی از تست‌های تألیفی ممکن است خارج از سرفصل ۱۴۰۶ باشد."
+
+  - id: cshub-stats
+    subject_id: stats
+    title: "بانک تست cshub — آمار و احتمال (شامل مبانی احتمال)"
+    kind: cshub_bank
+    purchased: true
+    approx_count: 457
+    count_detail: "432 تست کنکوری + 25 تست تألیفی"
+    source_url: "https://test-cshub.ir/"
+    note: "پوشش: علوم کامپیوتر، آی‌تی، مهندسی کامپیوتر."
+
+  - id: cshub-foundations
+    subject_id: foundations
+    title: "بانک تست cshub — مبانی کامپیوتر و برنامه‌سازی"
+    kind: cshub_bank
+    purchased: true
+    approx_count: 769
+    count_detail: "101 تست کنکوری + 668 تست تألیفی"
+    source_url: "https://test-cshub.ir/"
+    note: "درس جدید ۱۴۰۶؛ سابقهٔ کنکور ندارد، بنابراین بیشتر بانک تألیفی است (۸۷٪)."
+
+  - id: cshub-logic
+    subject_id: logic
+    title: "بانک تست cshub — مدارهای منطقی"
+    kind: cshub_bank
+    purchased: true
+    approx_count: 541
+    count_detail: "513 تست کنکوری + 28 تست تألیفی"
+    source_url: "https://test-cshub.ir/"
+    note: "پوشش: مهندسی کامپیوتر."
+
+  - id: cshub-arch
+    subject_id: arch
+    title: "بانک تست cshub — معماری کامپیوتر"
+    kind: cshub_bank
+    purchased: true
+    approx_count: 523
+    count_detail: "459 تست کنکوری + 64 تست تألیفی"
+    source_url: "https://test-cshub.ir/"
+    note: "پوشش: مهندسی کامپیوتر."
+
+  - id: cshub-dsa
+    subject_id: dsa
+    title: "بانک تست cshub — داده‌ساختارها و الگوریتم‌ها (ساختمان داده)"
+    kind: cshub_bank
+    purchased: true
+    approx_count: 2112
+    count_detail: "1215 تست کنکوری + 897 تست تألیفی"
+    source_url: "https://test-cshub.ir/"
+    note: "پوشش: علوم کامپیوتر، آی‌تی، مهندسی کامپیوتر. منبع اصلی درس dsa."
+
+  - id: cshub-algorithms
+    subject_id: dsa
+    title: "بانک تست cshub — طراحی الگوریتم‌"
+    kind: cshub_bank
+    purchased: true
+    approx_count: 890
+    count_detail: "431 تست کنکوری + 459 تست تألیفی"
+    source_url: "https://test-cshub.ir/"
+    note: >-
+      هشدار سرفصل: بخش بزرگی از این ردیف (حریصانه، برنامه‌ریزی پویا، پسگرد/شاخه‌وحد، NP، تقریبی،
+      برنامه‌ریزی خطی، تطابق رشته) طبق فهرست حذف cshub در ۱۴۰۶ از درس داده‌ساختار حذف شده است.
+      در سقف dsa حساب می‌شود ولی تست قابل‌استفادهٔ آن بسیار کمتر از ۸۹۰ است؛ فیلتر در سطح فصل انجام شود.
+
+  - id: cshub-toc
+    subject_id: toc
+    title: "بانک تست cshub — نظریه زبان‌ها و ماشین‌ها (مبانی نظریه محاسبه)"
+    kind: cshub_bank
+    purchased: true
+    approx_count: 502
+    count_detail: "441 تست کنکوری + 61 تست تألیفی"
+    source_url: "https://test-cshub.ir/"
+    note: "پوشش: علوم کامپیوتر، مهندسی کامپیوتر. منبع اصلی تست نظریه (درسنامهٔ شاپوری جداست)."
+
+  - id: cshub-os
+    subject_id: os
+    title: "بانک تست cshub — سیستم‌های عامل"
+    kind: cshub_bank
+    purchased: true
+    approx_count: 510
+    count_detail: "364 تست کنکوری + 146 تست تألیفی"
+    source_url: "https://test-cshub.ir/"
+    note: "پوشش: آی‌تی، مهندسی کامپیوتر."
+
+  - id: cshub-ai
+    subject_id: ai
+    title: "بانک تست cshub — هوش مصنوعی"
+    kind: cshub_bank
+    purchased: true
+    approx_count: 506
+    count_detail: "376 تست کنکوری + 130 تست تألیفی"
+    source_url: "https://test-cshub.ir/"
+    note: "پوشش: آی‌تی، مهندسی کامپیوتر."
+
+  - id: cshub-linear-algebra
+    subject_id: linear_algebra
+    title: "بانک تست cshub — مبانی ماتریس‌ها + جبر خطی"
+    kind: cshub_bank
+    purchased: false
+    approx_count: 219
+    count_detail: "69 تست کنکوری + 150 تست تألیفی"
+    source_url: "https://test-cshub.ir/"
+    note: "خریداری نشده («انتخاب») و درس هم طبق D05 dropped است. فقط برای ثبت کامل داشبورد."

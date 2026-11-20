@@ -1,0 +1,373 @@
+# seed/courses.yaml
+# لیست جلسات دوره‌ها (عنوان + مدت) — گزارش: docs/research/T-DATA-05-course-lessons.md
+# kind: lecture (آموزشی/درسنامه) | nokte_test (نکته و تست)
+# duration: "mm:ss" (دقیقه می‌تواند >59 باشد). پرلایک مدت را فقط به دقیقهٔ صحیح منتشر می‌کند → ثانیه‌ها 00 هستند (duration_min همان عدد خام).
+# total: "H:MM". estimated:true = لیست/مدت واقعی پیدا نشد و عدد تخمینی است. candidate:true = دوره‌ای که ممکن است دورهٔ کاربر باشد ولی کاربر تأیید نکرده.
+# ترتیب جلسات = ترتیب priority در دادهٔ صفحهٔ پرلایک. استخراج: 1405-08-23.
+# chapters: [id, ...] = نگاشت اولیهٔ جلسه→فصل (T-DATA-05 / issue #6). هنگام seed در lesson_chapters نوشته می‌شود.
+#   جلسات «حل کنکور سال‌های گذشته» و جلسات خارج از سرفصل ۱۴۰۶ عمداً بدون chapters رها شده‌اند (به فصلی نگاشت نمی‌شوند).
+courses:
+  - id: ai-teach
+    subject_id: ai
+    kind: lecture
+    teacher: "محمد انصاری"
+    platform: parlike
+    source_url: "https://www.parlike.com/courses/artint-ansari"
+    lessons_count: 22
+    total: "56:29"
+    total_min: 3389
+    estimated: false
+    user_given: { lessons: 22, total: "56:29" }   # docs/02 §6 — با پرلایک مطابق
+    lessons:
+      - { n: 1, title: "مفاهیم اولیه هوش مصنوعی", duration: "37:00", duration_min: 37, chapters: [ai-1] }
+      - { n: 2, title: "عامل‌های هوشمند", duration: "157:00", duration_min: 157, chapters: [ai-2] }
+      - { n: 3, title: "حل مسئله به کمک جستجو - بخش یکم", duration: "242:00", duration_min: 242, chapters: [ai-3] }
+      - { n: 4, title: "حل مسئله به کمک جستجو - بخش دوم", duration: "160:00", duration_min: 160, chapters: [ai-3] }
+      - { n: 5, title: "حل مسئله به کمک جستجو - بخش سوم", duration: "140:00", duration_min: 140, chapters: [ai-3] }
+      - { n: 6, title: "فراتر از جستجوهای کلاسیک", duration: "198:00", duration_min: 198, chapters: [ai-4] }
+      - { n: 7, title: "جستجوهای تخاصمی و بازی‌ها", duration: "204:00", duration_min: 204, chapters: [ai-5] }
+      - { n: 8, title: "ارضای محدودیت، جستجوی عقبگرد و انتشار محدودیت", duration: "163:00", duration_min: 163, chapters: [ai-6] }
+      - { n: 9, title: "تعمیم سازگاری، عقبگرد کارا و ساختار گراف محدودیت", duration: "158:00", duration_min: 158, chapters: [ai-6] }
+      - { n: 10, title: "عامل‌های مبتنی بر دانش و مفاهیم منطق و استنتاج", duration: "218:00", duration_min: 218, chapters: [ai-7] }
+      - { n: 11, title: "الگوریتم‌های استنتاجی، ارضاپذیری و دنیای ومپس", duration: "124:00", duration_min: 124, chapters: [ai-7] }
+      - { n: 12, title: "منطق مرتبه اول", duration: "167:00", duration_min: 167, chapters: [ai-8] }
+      - { n: 13, title: "استنتاج منطق مرتبه اول و ویژگی‌های زبان‌های بازنمایی", duration: "159:00", duration_min: 159, chapters: [ai-9] }
+      - { n: 14, title: "برنامه‌نویسی منطقی و الگوریتم رزولوشن", duration: "143:00", duration_min: 143, chapters: [ai-9] }
+      - { n: 15, title: "برنامه‌ریزی کلاسیک، زبان PDDL و گراف برنامه‌ریزی", duration: "152:00", duration_min: 152, chapters: [ai-10] }
+      - { n: 16, title: "الگوریتم گراف‌پلن، مسئله ارضاپذیری و برنامه‌ریزی جزئی", duration: "102:00", duration_min: 102, chapters: [ai-10] }
+      - { n: 17, title: "مفاهیم نظریه احتمال", duration: "130:00", duration_min: 130, chapters: [ai-11] }
+      - { n: 18, title: "عدم قطعیت", duration: "132:00", duration_min: 132, chapters: [ai-11] }
+      - { n: 19, title: "شبکه‌های بیز و یافتن استقلال‌های شرطی", duration: "173:00", duration_min: 173, chapters: [ai-11] }
+      - { n: 20, title: "استنتاج‌های احتمالی کارا و تقریبی", duration: "131:00", duration_min: 131, chapters: [ai-12] }
+      - { n: 21, title: "یادگیری ماشین، الگوریتم بیز ساده و درخت تصمیم", duration: "170:00", duration_min: 170, chapters: [ai-13] }
+      - { n: 22, title: "فرایند تصمیم‌گیری مارکوف (MDP) و Value Iteration", duration: "129:00", duration_min: 129, chapters: [ai-14] }
+  - id: ai-tips
+    subject_id: ai
+    kind: nokte_test
+    teacher: "محمد انصاری"
+    platform: parlike
+    source_url: "https://www.parlike.com/courses/testartint-ansari"
+    lessons_count: 17
+    total: "43:33"
+    total_min: 2613
+    estimated: false
+    user_given: { lessons: 17, total: "43:33" }   # docs/02 §6 — با پرلایک مطابق
+    lessons:
+      - { n: 1, title: "فصل اول (مقدمه) و فصل دوم (عامل‌های هوشمند)", duration: "121:00", duration_min: 121, chapters: [ai-1, ai-2] }
+      - { n: 2, title: "حل مسئله به کمک جستجو (1)", duration: "242:00", duration_min: 242, chapters: [ai-3] }
+      - { n: 3, title: "حل مسئله به کمک جستجو (2)", duration: "255:00", duration_min: 255, chapters: [ai-3] }
+      - { n: 4, title: "فراتر از جستجوهای کلاسیک", duration: "193:00", duration_min: 193, chapters: [ai-4] }
+      - { n: 5, title: "جستجوهای تخاصمی و بازی‌ها", duration: "191:00", duration_min: 191, chapters: [ai-5] }
+      - { n: 6, title: "مسائل ارضای محدودیت", duration: "167:00", duration_min: 167, chapters: [ai-6] }
+      - { n: 7, title: "عامل‌های منطقی", duration: "256:00", duration_min: 256, chapters: [ai-7] }
+      - { n: 8, title: "منطق مرتبه اول", duration: "193:00", duration_min: 193, chapters: [ai-8] }
+      - { n: 9, title: "استنتاج منطق مرتبه اول", duration: "208:00", duration_min: 208, chapters: [ai-9] }
+      - { n: 10, title: "برنامه‌ریزی کلاسیک", duration: "121:00", duration_min: 121, chapters: [ai-10] }
+      - { n: 11, title: "عدم قطعیت و استنتاج احتمالی", duration: "94:00", duration_min: 94, chapters: [ai-11, ai-12] }
+      - { n: 12, title: "مفاهیم یادگیری ماشین", duration: "94:00", duration_min: 94, chapters: [ai-13] }
+      - { n: 13, title: "انجام تصمیم‌گیری‌های پیچیده", duration: "95:00", duration_min: 95, chapters: [ai-14] }
+      - { n: 14, title: "کنکور ارشد مهندسی کامپیوتر و فناوری اطلاعات 1401", duration: "101:00", duration_min: 101 }
+      - { n: 15, title: "کنکور ارشد مهندسی کامپیوتر و فناوری اطلاعات 1402", duration: "73:00", duration_min: 73 }
+      - { n: 16, title: "حل سوالات کنکور سال 1403", duration: "71:00", duration_min: 71 }
+      - { n: 17, title: "حل سوالات کنکور سال 1404", duration: "138:00", duration_min: 138 }
+  - id: dsa-tips
+    subject_id: dsa
+    kind: nokte_test
+    teacher: "محمد انصاری"
+    platform: parlike
+    source_url: "https://www.parlike.com/courses/dsalgtest-ansari"
+    lessons_count: 34
+    total: "95:57"
+    total_min: 5757
+    estimated: false
+    user_given: { lessons: 34, total: "95:57" }   # docs/02 §6 — با پرلایک مطابق
+    lessons:
+      - { n: 1, title: "رشد توابع و نمادهای جانبی", duration: "194:00", duration_min: 194, chapters: [dsa-1] }
+      - { n: 2, title: "تحلیل الگوریتم‌های غیر بازگشتی", duration: "257:00", duration_min: 257, chapters: [dsa-1] }
+      - { n: 3, title: "حل روابط بازگشتی - بخش 1", duration: "164:00", duration_min: 164, chapters: [dsa-2] }
+      - { n: 4, title: "حل روابط بازگشتی - بخش 2", duration: "155:00", duration_min: 155, chapters: [dsa-2] }
+      - { n: 5, title: "الگوریتم‌های بازگشتی و تقسیم و غلبه - بخش 1", duration: "240:00", duration_min: 240, chapters: [dsa-2] }
+      - { n: 6, title: "الگوریتم‌های بازگشتی و تقسیم و غلبه - بخش 2", duration: "191:00", duration_min: 191, chapters: [dsa-2] }
+      - { n: 7, title: "ساختمان‌های داده پایه - بخش اول", duration: "223:00", duration_min: 223, chapters: [dsa-3] }
+      - { n: 8, title: "ساختمان‌های داده پایه - بخش دوم", duration: "152:00", duration_min: 152, chapters: [dsa-3] }
+      - { n: 9, title: "درخت‌ها", duration: "236:00", duration_min: 236, chapters: [dsa-4] }
+      - { n: 10, title: "درخت‌های جستجوی دودویی", duration: "162:00", duration_min: 162, chapters: [dsa-4] }
+      - { n: 11, title: "هرم", duration: "149:00", duration_min: 149, chapters: [dsa-4] }
+      - { n: 12, title: "داده ساختارهای پیشرفته", duration: "199:00", duration_min: 199, chapters: [dsa-4] }
+      - { n: 13, title: "درهم‌سازی", duration: "255:00", duration_min: 255, chapters: [dsa-6] }
+      - { n: 14, title: "الگوریتم‌های جستجو در آرایه", duration: "188:00", duration_min: 188, chapters: [dsa-3] }
+      - { n: 15, title: "مرتب‌سازی و انتخاب- بخش یک", duration: "183:00", duration_min: 183, chapters: [dsa-5] }
+      - { n: 16, title: "مرتب‌سازی و انتخاب- بخش دو", duration: "196:00", duration_min: 196, chapters: [dsa-5] }
+      - { n: 17, title: "مرتب‌سازی و انتخاب- بخش سه", duration: "136:00", duration_min: 136, chapters: [dsa-5] }
+      - { n: 18, title: "الگوریتم حریصانه- بخش یک", duration: "178:00", duration_min: 178 }
+      - { n: 19, title: "الگوریتم حریصانه- بخش دو", duration: "162:00", duration_min: 162 }
+      - { n: 20, title: "برنامه‌ریزی پویا- بخش اول", duration: "185:00", duration_min: 185 }
+      - { n: 21, title: "برنامه‌ریزی پویا- بخش دو", duration: "205:00", duration_min: 205 }
+      - { n: 22, title: "گراف- بخش اول", duration: "207:00", duration_min: 207, chapters: [dsa-7] }
+      - { n: 23, title: "گراف- بخش دوم", duration: "195:00", duration_min: 195, chapters: [dsa-7] }
+      - { n: 24, title: "گراف- بخش سوم (*)", duration: "152:00", duration_min: 152, chapters: [dsa-7] }
+      - { n: 25, title: "گراف- بخش چهارم (*)", duration: "185:00", duration_min: 185, chapters: [dsa-7] }
+      - { n: 26, title: "گراف- بخش پنجم (*)", duration: "222:00", duration_min: 222, chapters: [dsa-7] }
+      - { n: 27, title: "نظریه ان‌پی", duration: "154:00", duration_min: 154 }
+      - { n: 28, title: "بازگشت به عقب", duration: "51:00", duration_min: 51 }
+      - { n: 29, title: "هندسه محاسباتی", duration: "53:00", duration_min: 53 }
+      - { n: 30, title: "برنامه‌ریزی خطی", duration: "65:00", duration_min: 65 }
+      - { n: 31, title: "تطابق رشته", duration: "58:00", duration_min: 58 }
+      - { n: 32, title: "کنکور مهندسی کامپیوتر 1404", duration: "153:00", duration_min: 153 }
+      - { n: 33, title: "کنکور مهندسی فناوری اطلاعات 1404", duration: "80:00", duration_min: 80 }
+      - { n: 34, title: "کنکور دکتری مهندسی کامپیوتر 1404", duration: "172:00", duration_min: 172 }
+  - id: os-teach
+    subject_id: os
+    kind: lecture
+    teacher: "ابوالفضل حقیقت"
+    platform: parlike
+    source_url: "https://www.parlike.com/courses/os-haghighat"
+    lessons_count: 46
+    total: "78:16"
+    total_min: 4696
+    estimated: false
+    user_given: { lessons: 46, total: "78:16" }   # docs/02 §6 — با پرلایک مطابق
+    lessons:
+      - { n: 1, title: "معرفی دوره: چرا کتاب سیلبرشاتز؟", duration: "1:00", duration_min: 1, chapters: [os-1] }
+      - { n: 2, title: "سیستم عامل چیست و چرا سیستم عامل؟", duration: "161:00", duration_min: 161, chapters: [os-1, os-2] }
+      - { n: 3, title: "سازمان کامپیوتر", duration: "192:00", duration_min: 192, chapters: [os-1] }
+      - { n: 4, title: "وقفه‌ها (Interrupts)، سرکشی و DMA", duration: "220:00", duration_min: 220, chapters: [os-1] }
+      - { n: 5, title: "حفاظت در پردازنده", duration: "82:00", duration_min: 82, chapters: [os-1] }
+      - { n: 6, title: "تک‌برنامگی (ساده و Spooling)", duration: "107:00", duration_min: 107, chapters: [os-2] }
+      - { n: 7, title: "چندبرنامگی، اشتراک زمانی و چندوظیفگی", duration: "80:00", duration_min: 80, chapters: [os-2] }
+      - { n: 8, title: "سیستم‌های عامل مدرن و سیستم‌های توزیع‌شده", duration: "109:00", duration_min: 109, chapters: [os-2] }
+      - { n: 9, title: "فرایندها و فایل‌ها", duration: "81:00", duration_min: 81, chapters: [os-3] }
+      - { n: 10, title: "فراخوان‌های سیستمی و اجرای برنامه‌ها", duration: "126:00", duration_min: 126, chapters: [os-2] }
+      - { n: 11, title: "طراحی، پیاده‌سازی و ساختار سیستم‌های عامل", duration: "123:00", duration_min: 123, chapters: [os-2] }
+      - { n: 12, title: "ماشین‌های مجازی و کانتینرها", duration: "58:00", duration_min: 58, chapters: [os-2] }
+      - { n: 13, title: "ایجاد، خاتمه، وضعیت‌ها و تعویض فرایندها", duration: "182:00", duration_min: 182, chapters: [os-3] }
+      - { n: 14, title: "ارتباط بین فرایندها (IPC)", duration: "248:00", duration_min: 248, chapters: [os-3] }
+      - { n: 15, title: "ریسمان‌ها (نخ‌ها) و همروندی", duration: "188:00", duration_min: 188, chapters: [os-3] }
+      - { n: 16, title: "مفاهیم پیشرفته چندریسمانی", duration: "227:00", duration_min: 227, chapters: [os-3] }
+      - { n: 17, title: "زمان‌بندی CPU در سیستم‌های دسته‌ای", duration: "150:00", duration_min: 150, chapters: [os-3] }
+      - { n: 18, title: "زمان‌بندی CPU در سیستم‌های تعاملی", duration: "140:00", duration_min: 140, chapters: [os-3] }
+      - { n: 19, title: "زمان‌بندی چندریسمانی و چندپردازنده", duration: "63:00", duration_min: 63, chapters: [os-3] }
+      - { n: 20, title: "زمان‌بندی CPU در سیستم‌های بلادرنگ", duration: "61:00", duration_min: 61, chapters: [os-3] }
+      - { n: 21, title: "زمان‌بندی سیستم‌عامل‌های رایج و ارزیابی آن", duration: "37:00", duration_min: 37, chapters: [os-3] }
+      - { n: 22, title: "همروندی: ارتباط، شرایط رقابتی و همگام‌سازی", duration: "138:00", duration_min: 138, chapters: [os-4] }
+      - { n: 23, title: "انحصار متقابل: رویکردهای نرم‌افزاری", duration: "31:00", duration_min: 31, chapters: [os-4] }
+      - { n: 24, title: "انحصار متقابل: راه حل پیترسون", duration: "68:00", duration_min: 68, chapters: [os-4] }
+      - { n: 25, title: "انحصار متقابل: رویکردهای سخت‌افزاری", duration: "63:00", duration_min: 63, chapters: [os-4] }
+      - { n: 26, title: "Mutex و رویکردهای خوابیدن و بیدار کردن", duration: "65:00", duration_min: 65, chapters: [os-4] }
+      - { n: 27, title: "سمافور (Semaphore)", duration: "101:00", duration_min: 101, chapters: [os-4] }
+      - { n: 28, title: "همگام‌سازی با استفاده از سمافورها", duration: "112:00", duration_min: 112, chapters: [os-4] }
+      - { n: 29, title: "مانیتور", duration: "103:00", duration_min: 103, chapters: [os-4] }
+      - { n: 30, title: "مفهوم Liveness و ارزیابی روش‌ها", duration: "24:00", duration_min: 24, chapters: [os-4] }
+      - { n: 31, title: "بن‌بست: مفاهیم، شرایط و مدل‌سازی", duration: "112:00", duration_min: 112, chapters: [os-5] }
+      - { n: 32, title: "راهبردهای بن‌بست: (1) پیش‌گیری", duration: "71:00", duration_min: 71, chapters: [os-5] }
+      - { n: 33, title: "راهبردهای بن‌بست: (2) اجتناب", duration: "81:00", duration_min: 81, chapters: [os-5] }
+      - { n: 34, title: "سایر راهبردهای بن‌بست", duration: "60:00", duration_min: 60, chapters: [os-5] }
+      - { n: 35, title: "مدیریت I/O", duration: "63:00", duration_min: 63, chapters: [os-6] }
+      - { n: 36, title: "دیسک و RAID", duration: "61:00", duration_min: 61, chapters: [os-6] }
+      - { n: 37, title: "الگوریتم‌های زمان‌بندی دیسک", duration: "61:00", duration_min: 61, chapters: [os-6] }
+      - { n: 38, title: "مدیریت حافظه ابتدایی", duration: "83:00", duration_min: 83, chapters: [os-7] }
+      - { n: 39, title: "تخصیص حافظه در پارتیشن‌بندی پویا و مبادله", duration: "74:00", duration_min: 74, chapters: [os-7] }
+      - { n: 40, title: "صفحه‌بندی (Paging) ساده", duration: "137:00", duration_min: 137, chapters: [os-7] }
+      - { n: 41, title: "صفحه‌بندی حافظه مجازی", duration: "75:00", duration_min: 75, chapters: [os-8] }
+      - { n: 42, title: "انواع جدول صفحه و TLB", duration: "77:00", duration_min: 77, chapters: [os-8] }
+      - { n: 43, title: "ترجمه آدرس", duration: "57:00", duration_min: 57, chapters: [os-8] }
+      - { n: 44, title: "الگوریتم‌های جایگزینی صفحه", duration: "184:00", duration_min: 184, chapters: [os-8] }
+      - { n: 45, title: "نکات طراحی سیستم‌های صفحه‌بندی", duration: "79:00", duration_min: 79, chapters: [os-8] }
+      - { n: 46, title: "قطعه‌بندی و ترکیب آن با صفحه‌بندی", duration: "80:00", duration_min: 80, chapters: [os-7, os-8] }
+  - id: os-tips
+    subject_id: os
+    kind: nokte_test
+    teacher: "ابوالفضل حقیقت"
+    platform: parlike
+    source_url: "https://www.parlike.com/courses/testos-haghighat"
+    lessons_count: 24
+    total: "54:08"
+    total_min: 3248
+    estimated: false
+    user_given: { lessons: 24, total: "54:08" }   # docs/02 §6 — با پرلایک مطابق
+    lessons:
+      - { n: 1, title: "مفاهیم پایه و سخت‌افزار - بخش اول", duration: "177:00", duration_min: 177, chapters: [os-1] }
+      - { n: 2, title: "مفاهیم پایه و سخت‌افزار - بخش دوم", duration: "88:00", duration_min: 88, chapters: [os-1] }
+      - { n: 3, title: "مفاهیم سیستم‌عامل - بخش اول", duration: "100:00", duration_min: 100, chapters: [os-2] }
+      - { n: 4, title: "مفاهیم سیستم‌عامل - بخش دوم", duration: "114:00", duration_min: 114, chapters: [os-2] }
+      - { n: 5, title: "مفاهیم سیستم‌عامل - بخش سوم", duration: "120:00", duration_min: 120, chapters: [os-2] }
+      - { n: 6, title: "فصل سوم: الف) فرایندها و وضعیت آنها - بخش اول", duration: "126:00", duration_min: 126, chapters: [os-3] }
+      - { n: 7, title: "هم‌روندی، شرایط رقابتی، انحصار متقابل", duration: "88:00", duration_min: 88, chapters: [os-4] }
+      - { n: 8, title: "فصل سوم: الف) فرایندها و وضعیت آنها - بخش دوم", duration: "84:00", duration_min: 84, chapters: [os-3] }
+      - { n: 9, title: "سمافور، مانیتور، همگام‌سازی", duration: "125:00", duration_min: 125, chapters: [os-4] }
+      - { n: 10, title: "فصل سوم (ب) ارتباط بین فرآیندها (IPC)", duration: "86:00", duration_min: 86, chapters: [os-3] }
+      - { n: 11, title: "فصل سوم: ج) ریسمان‌ها و همروندی", duration: "177:00", duration_min: 177, chapters: [os-3] }
+      - { n: 12, title: "بن‌بست", duration: "125:00", duration_min: 125, chapters: [os-5] }
+      - { n: 13, title: "فصل سوم: د) زمان‌بندی (1)", duration: "209:00", duration_min: 209, chapters: [os-3] }
+      - { n: 14, title: "I/O و دیسک", duration: "51:00", duration_min: 51, chapters: [os-6] }
+      - { n: 15, title: "فصل سوم: ه) زمان‌بندی (2)", duration: "196:00", duration_min: 196, chapters: [os-3] }
+      - { n: 16, title: "مدیریت حافظه (پارتیشن بندی ایستا و پویا و مبادله)", duration: "64:00", duration_min: 64, chapters: [os-7] }
+      - { n: 17, title: "حافظه مجازی (1)", duration: "125:00", duration_min: 125, chapters: [os-8] }
+      - { n: 18, title: "حافظه مجازی (2)", duration: "137:00", duration_min: 137, chapters: [os-8] }
+      - { n: 19, title: "حافظه مجازی (3)", duration: "108:00", duration_min: 108, chapters: [os-8] }
+      - { n: 20, title: "نکته و تست فصل اول کتاب سیلبرشاتز", duration: "198:00", duration_min: 198, chapters: [os-1, os-2] }
+      - { n: 21, title: "نکته و تست فصل دوم کتاب سیلبرشاتز", duration: "206:00", duration_min: 206, chapters: [os-2] }
+      - { n: 22, title: "کنکور ارشد کامپیوتر و فناوری اطلاعات سال 1400", duration: "182:00", duration_min: 182 }
+      - { n: 23, title: "کنکور ارشد کامپیوتر و فناوری اطلاعات سال 1401", duration: "245:00", duration_min: 245 }
+      - { n: 24, title: "کنکور ارشد کامپیوتر و فناوری اطلاعات سال 1402", duration: "117:00", duration_min: 117 }
+  - id: dsa-teach
+    subject_id: dsa
+    kind: lecture
+    teacher: "محمد انصاری"
+    platform: parlike
+    source_url: "https://www.parlike.com/courses/dsalg-ansari"
+    lessons_count: 30
+    total: "75:13"
+    total_min: 4513
+    estimated: false
+    candidate: true
+    note: "دورهٔ آموزشی داده‌ساختار کاربر در docs مشخص نیست (استاد «?»). این دورهٔ آموزشی انصاری در پرلایک است؛ cshub انصاری یا یوسفی را پیشنهاد می‌کند. جلسات 22-24 در خود عنوان (*) دارند. جلسات 26-30 (NP، پسگرد، هندسه، برنامه‌ریزی خطی، تطابق رشته) طبق cshub در سرفصل ۱۴۰۶ نیستند."
+    lessons:
+      - { n: 1, title: "معرفی دروس ساختمان داده و الگوریتم و ریاضیات پایه", duration: "94:00", duration_min: 94 }
+      - { n: 2, title: "تحلیل الگوریتم‌ها، رشد توابع و نمادهای مجانبی", duration: "200:00", duration_min: 200 }
+      - { n: 3, title: "تحلیل زمانی الگوریتم‌ها", duration: "177:00", duration_min: 177 }
+      - { n: 4, title: "حل روابط بازگشتی", duration: "212:00", duration_min: 212 }
+      - { n: 5, title: "روش تقسیم و غلبه", duration: "225:00", duration_min: 225 }
+      - { n: 6, title: "ادامه‌ی روش تقسیم و غلبه", duration: "204:00", duration_min: 204 }
+      - { n: 7, title: "ساختمان‌های داده پایه", duration: "216:00", duration_min: 216 }
+      - { n: 8, title: "ادامه‌ی ساختمان‌های داده پایه", duration: "158:00", duration_min: 158 }
+      - { n: 9, title: "درخت‌ها", duration: "200:00", duration_min: 200 }
+      - { n: 10, title: "درخت‌های AVL و قرمز-سیاه", duration: "166:00", duration_min: 166 }
+      - { n: 11, title: "هرم‌ها (Heaps)", duration: "187:00", duration_min: 187 }
+      - { n: 12, title: "درخت‌های ویژه", duration: "101:00", duration_min: 101 }
+      - { n: 13, title: "جدول‌های درهم سازی", duration: "193:00", duration_min: 193 }
+      - { n: 14, title: "مرتب‌سازی مقایسه‌ای", duration: "180:00", duration_min: 180 }
+      - { n: 15, title: "مرتب سازی غیر مقایسه‌‌ای و مسئله انتخاب", duration: "157:00", duration_min: 157 }
+      - { n: 16, title: "الگوریتم‌های حریصانه - بخش اول", duration: "145:00", duration_min: 145 }
+      - { n: 17, title: "الگوریتم‌های حریصانه - بخش دوم", duration: "167:00", duration_min: 167 }
+      - { n: 18, title: "برنامه‌ریزی پویا - بخش اول", duration: "136:00", duration_min: 136 }
+      - { n: 19, title: "برنامه‌ریزی پویا - بخش دوم", duration: "170:00", duration_min: 170 }
+      - { n: 20, title: "گراف‌ها", duration: "206:00", duration_min: 206 }
+      - { n: 21, title: "کوتاه‌ترین مسیرهای هم مبدا", duration: "154:00", duration_min: 154 }
+      - { n: 22, title: "کوتاه‌ترین مسیر بین جفت رئوس (*)", duration: "119:00", duration_min: 119 }
+      - { n: 23, title: "درخت پوشای کمینه (*)", duration: "150:00", duration_min: 150 }
+      - { n: 24, title: "شار بیشینه (*)", duration: "130:00", duration_min: 130 }
+      - { n: 25, title: "آنالیز استهلاکی", duration: "129:00", duration_min: 129 }
+      - { n: 26, title: "نظریه ان‌پی", duration: "110:00", duration_min: 110 }
+      - { n: 27, title: "بازگشت به عقب", duration: "51:00", duration_min: 51 }
+      - { n: 28, title: "هندسه محاسباتی", duration: "53:00", duration_min: 53 }
+      - { n: 29, title: "برنامه‌ریزی خطی", duration: "65:00", duration_min: 65 }
+      - { n: 30, title: "تطابق رشته", duration: "58:00", duration_min: 58 }
+  - id: discrete-teach
+    subject_id: discrete
+    kind: lecture
+    teacher: "هادی یوسفی"
+    platform: rasatadris
+    source_url: "https://rasatadris.ir/product/discrete-mathematics-course/"
+    total: "51:00"
+    total_min: 3060
+    total_is_rounded_claim: true   # عدد ساعت گرد از متن صفحهٔ فروش
+    lessons: []                    # لیست جلسات با مدت منتشر نشده
+    estimated: false
+    candidate: true
+    note: "docs/02 منبع پیشنهادی یوسفی را ذکر می‌کند ولی کاربر دوره/استادش را تأیید نکرده. «مدت زمان فیلم آموزش ریاضیات گسسته 51 ساعت» — 9 فصل؛ لیست جلسه منتشر نشده"
+  - id: discrete-tips
+    subject_id: discrete
+    kind: nokte_test
+    teacher: "هادی یوسفی"
+    platform: rasatadris
+    source_url: "https://rasatadris.ir/product/discrete-mathematics-tips-and-test/"
+    total: "140:00"
+    total_min: 8400
+    total_is_rounded_claim: true   # عدد ساعت گرد از متن صفحهٔ فروش
+    lessons: []                    # لیست جلسات با مدت منتشر نشده
+    estimated: false
+    candidate: true
+    note: "docs/02 منبع پیشنهادی یوسفی را ذکر می‌کند ولی کاربر دوره/استادش را تأیید نکرده. «ساعت دوره: 140 ساعت» — شامل تست‌های ارشد/دکتری کامپیوتر، علوم کامپیوتر، IT و تمرین‌های روزن/گریمالدی/کتاب نارنجی؛ فقط بخشی برای ارشد مهندسی لازم است"
+  - id: logic-teach
+    subject_id: logic
+    kind: lecture
+    teacher: "هادی یوسفی"
+    platform: rasatadris
+    source_url: "https://rasatadris.ir/product/logic-circuit-or-digital-systems-course/"
+    total: "40:00"
+    total_min: 2400
+    total_is_rounded_claim: true   # عدد ساعت گرد از متن صفحهٔ فروش
+    lessons: []                    # لیست جلسات با مدت منتشر نشده
+    estimated: false
+    candidate: true
+    note: "docs/02: «یوسفی یا باغستانی» — کاربر هنوز مشخص نکرده کدام. «حدود 40 ساعت آموزش»"
+  - id: logic-tips
+    subject_id: logic
+    kind: nokte_test
+    teacher: "هادی یوسفی"
+    platform: rasatadris
+    source_url: "https://rasatadris.ir/product/logic-circuit-or-digital-systems-tips-and-test-course/"
+    total: "69:00"
+    total_min: 4140
+    total_is_rounded_claim: true   # عدد ساعت گرد از متن صفحهٔ فروش
+    lessons: []                    # لیست جلسات با مدت منتشر نشده
+    estimated: false
+    candidate: true
+    note: "docs/02: «یوسفی یا باغستانی» — کاربر هنوز مشخص نکرده کدام. «حدود 69 ساعت»: فصل‌به‌فصل 38 ساعت + ارشد برق 8 + ارشد کامپیوتر 12 + دکتری 11"
+  - id: arch-teach
+    subject_id: arch
+    kind: lecture
+    teacher: "هادی یوسفی"
+    platform: rasatadris
+    source_url: "https://rasatadris.ir/product/computer-architecture-course/"
+    total: "34:00"
+    total_min: 2040
+    total_is_rounded_claim: true   # عدد ساعت گرد از متن صفحهٔ فروش
+    lessons: []                    # لیست جلسات با مدت منتشر نشده
+    estimated: false
+    candidate: true
+    note: "docs/02 منبع پیشنهادی یوسفی را ذکر می‌کند ولی کاربر دوره/استادش را تأیید نکرده. «ساعت دوره: 34 ساعت» — سرفصل بخش‌به‌بخش منتشر شده (بدون مدت)"
+  - id: arch-tips
+    subject_id: arch
+    kind: nokte_test
+    teacher: "هادی یوسفی"
+    platform: rasatadris
+    source_url: "https://rasatadris.ir/product/computer-architecture-tips-and-test-course/"
+    total: "49:00"
+    total_min: 2940
+    total_is_rounded_claim: true   # عدد ساعت گرد از متن صفحهٔ فروش
+    lessons: []                    # لیست جلسات با مدت منتشر نشده
+    estimated: false
+    candidate: true
+    note: "docs/02 منبع پیشنهادی یوسفی را ذکر می‌کند ولی کاربر دوره/استادش را تأیید نکرده. «49 ساعت»: فصل‌به‌فصل 32 ساعت + سال‌به‌سال ارشد و دکتری 17 ساعت"
+  - id: toc-teach
+    subject_id: toc
+    kind: lecture
+    teacher: "فردین شاپوری"
+    platform: "telegram/bale/eitaa (بدون سایت)"
+    source_url: "https://t.me/fardinshapouri"
+    est_hours: [22, 32]   # همان تخمین seed/subjects.yaml
+    lessons: []
+    estimated: true
+    note: "لیست جلسات/مدت در هیچ صفحهٔ عمومی پیدا نشد؛ فقط از کانال فروش. پس از خرید/دسترسی، کاربر باید لیست را وارد کند (Import)."
+  - id: toc-tips
+    subject_id: toc
+    kind: nokte_test
+    teacher: "فردین شاپوری"
+    platform: "telegram/bale/eitaa (بدون سایت)"
+    source_url: "https://t.me/fardinshapouri"
+    est_hours: [22, 32]   # همان تخمین seed/subjects.yaml
+    lessons: []
+    estimated: true
+    note: "لیست جلسات/مدت در هیچ صفحهٔ عمومی پیدا نشد؛ فقط از کانال فروش. پس از خرید/دسترسی، کاربر باید لیست را وارد کند (Import)."
+  - id: stats-teach
+    subject_id: stats
+    kind: lecture
+    teacher: "قمی"
+    platform: "binesh (فروش در تلگرام/بله؛ سایت ندارد)"
+    source_url: "https://t.me/BINESHMOASESE"
+    est_hours: [22, 35]   # همان تخمین seed/subjects.yaml
+    lessons: []
+    estimated: true
+    note: "لیست جلسات/مدت در هیچ صفحهٔ عمومی پیدا نشد؛ فقط از کانال فروش. پس از خرید/دسترسی، کاربر باید لیست را وارد کند (Import)."
+  - id: stats-tips
+    subject_id: stats
+    kind: nokte_test
+    teacher: "قمی"
+    platform: "binesh (فروش در تلگرام/بله؛ سایت ندارد)"
+    source_url: "https://t.me/BINESHMOASESE"
+    est_hours: [23, 35]   # همان تخمین seed/subjects.yaml
+    lessons: []
+    estimated: true
+    note: "لیست جلسات/مدت در هیچ صفحهٔ عمومی پیدا نشد؛ فقط از کانال فروش. پس از خرید/دسترسی، کاربر باید لیست را وارد کند (Import)."

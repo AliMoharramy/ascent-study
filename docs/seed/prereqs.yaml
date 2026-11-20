@@ -1,0 +1,30 @@
+# seed/prereqs.yaml — chapter prerequisite graph for Triage (docs/03 §6: «پیش‌نیاز M را نمی‌توان در C گذاشت»).
+# Format: chapter: [chapters it requires]. Ids = <subject>-<no> (subjects.yaml). Conservative: only strong, well-known links.
+prereqs:
+  dsa-7: [discrete-6]          # graph algorithms ← graph theory
+  dsa-2: [discrete-3]          # recurrences / divide & conquer ← recurrence relations
+  dsa-5: [dsa-1]               # sorting & order statistics ← analysis of algorithms
+  dsa-4: [dsa-3]               # trees ← basic data structures
+  stats-2: [discrete-2]        # probability ← counting
+  stats-3: [stats-2]
+  stats-4: [stats-3]
+  stats-5: [stats-3]
+  arch-1: [logic-1]            # floating point ← number systems
+  arch-3: [logic-4, logic-5]   # RTL ← combinational & sequential circuits
+  arch-4: [arch-3]
+  logic-4: [logic-2]           # combinational ← boolean algebra
+  logic-5: [logic-4]
+  logic-6: [logic-5]
+  ai-4: [ai-3]                 # beyond classical search ← search
+  ai-5: [ai-3]
+  ai-8: [ai-7]                 # FOL ← logical agents
+  ai-9: [ai-8]
+  ai-7: [discrete-1]           # logical agents ← propositional logic
+  toc-3: [toc-2]
+  toc-4: [toc-3]
+  toc-7: [toc-5]
+  toc-8: [toc-5]
+  toc-10: [toc-9]
+  os-4: [os-3]                 # synchronisation ← processes
+  os-5: [os-4]                 # deadlock ← synchronisation
+  os-8: [os-7]                 # virtual memory ← main memory

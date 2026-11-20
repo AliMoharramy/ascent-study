@@ -1,0 +1,45 @@
+THE ASCENT — third-party content notice
+=======================================
+
+This file explains what in the repository is NOT covered by the MIT license, and why it is there.
+
+0. Scope of the MIT license
+   ------------------------
+   The MIT license in the LICENSE file covers the SOURCE CODE and the documentation text of this repository. It does NOT
+   cover the artwork (public/art/, CC BY 4.0), third-party fonts (SIL OFL 1.1), or the third-party data described below.
+
+1. Seed data (docs/seed/*.yaml) and research reports (docs/research/)
+   --------------------------------------------------------------
+   The repository ships a reference data set for one specific national entrance exam: syllabus
+   structure, mock-exam schedules, and — as a personal snapshot taken in November 2026 — course lesson lists and
+   durations, and test-bank counts that were read from third-party learning platforms (named in the files, e.g. parlike
+   and cshub) by the project owner for personal study planning.
+
+   * The facts were collected manually/by the owner for personal use and are provided "as is", unofficial, possibly
+     outdated or wrong. Do not rely on them for decisions.
+   * Titles, lists and counts belong to their respective owners. This repository does not claim any right over them and
+     the MIT license does not apply to them.
+   * If you are a rights holder and want an item removed, open an issue (or contact the maintainer) and it will be
+     removed promptly, including from the published history where practical.
+   * The application never stores exam questions. Please do not contribute copyrighted question banks, course videos or
+     paid material of any kind.
+
+2. Artwork (public/art/)
+   ---------------------
+   AI-generated images created for this project; see public/art/LICENSE.md (CC BY 4.0, to the extent any rights exist,
+   no warranty). Replace them with your own if you need legal certainty for commercial use.
+
+3. Fonts
+   -----
+   @fontsource/bebas-neue, @fontsource/nunito, @fontsource/vazirmatn — SIL Open Font License 1.1.
+
+4. Dependencies
+   ------------
+   Each npm package keeps its own license (direct dependencies are MIT, Apache-2.0, ISC, MPL-2.0 or OFL-1.1). Run
+   `npm ls --all` and inspect node_modules/*/package.json for the full list.
+
+5. Trademarks
+   ----------
+   Product and platform names mentioned in the documentation (for example Duolingo, Neon, Vercel, Telegram) are
+   trademarks of their owners and are used only to describe compatibility or to analyse public product ideas. This
+   project is not affiliated with or endorsed by them.

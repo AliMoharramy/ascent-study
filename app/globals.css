@@ -1,0 +1,191 @@
+/* Self-hosted fonts (no CDN — doc 07 §8). Only the subsets we need: latin + arabic(fa). */
+@import "@fontsource/bebas-neue/latin-400.css";
+@import "@fontsource/nunito/latin-400.css";
+@import "@fontsource/nunito/latin-600.css";
+@import "@fontsource/nunito/latin-800.css";
+@import "@fontsource/vazirmatn/arabic-400.css";
+@import "@fontsource/vazirmatn/arabic-700.css";
+@import "@fontsource/vazirmatn/arabic-900.css";
+@import "./tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    background: rgb(var(--bg));
+    color: rgb(var(--text));
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply font-body text-body;
+    min-height: 100dvh;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Persian free text: right-to-left, Vazirmatn. `dir="auto"` on inputs picks direction from content. */
+  [lang="fa"],
+  .fa {
+    font-family: "Vazirmatn", "Nunito", sans-serif;
+  }
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+  :focus-visible {
+    outline: 3px solid rgb(var(--focus-ring));
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+  ::selection {
+    background: rgb(var(--c-purple) / 0.45);
+  }
+}
+
+@layer components {
+  /* Skip link (#108): hidden until keyboard-focused, then pinned top-left */
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-[100] focus:rounded-pill focus:bg-purple focus:px-5 focus:py-2.5 focus:font-extrabold focus:text-white;
+  }
+  .card {
+    @apply rounded-card bg-surface-1 p-5 shadow-card;
+  }
+  .card-color {
+    @apply rounded-card p-5 text-on-color shadow-card;
+  }
+  .display {
+    @apply font-display uppercase tracking-wide;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-pill px-5 py-2.5 text-body-s font-extrabold transition
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-btn-primary text-btn-primary-text hover:brightness-125 active:scale-[.98];
+  }
+  .btn-accent {
+    @apply btn bg-purple text-white hover:brightness-110 active:scale-[.98];
+  }
+  .btn-ghost {
+    @apply btn border border-line bg-transparent text-ink hover:bg-surface-2;
+  }
+  .btn-ghost-on-color {
+    @apply btn border border-on-color/30 bg-transparent text-on-color hover:bg-on-color/10;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-pill px-3 py-1 text-caption font-extrabold;
+  }
+  .field {
+    @apply w-full rounded-2xl border border-line bg-surface-2 px-4 py-2.5 text-ink placeholder:text-muted
+      focus:border-purple focus:outline-none;
+  }
+  .label {
+    @apply mb-1 block text-caption font-extrabold uppercase tracking-wider text-muted;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes pop-in {
+  0% {
+    transform: scale(0.92) translateY(6px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+.animate-pop {
+  animation: pop-in 0.28s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes pulse-dot {
+  50% {
+    opacity: 0.35;
+  }
+}
+.animate-pulse-dot {
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+/* XP Pop (doc 08 §2.4): rises and fades in ~600 ms */
+@keyframes xp-pop {
+  0% { transform: translateY(12px) scale(0.8); opacity: 0; }
+  20% { transform: translateY(0) scale(1.08); opacity: 1; }
+  100% { transform: translateY(-36px) scale(1); opacity: 0; }
+}
+.xp-pop { animation: xp-pop 1s ease-out both; }
+@keyframes light-up {
+  0% { filter: brightness(1); transform: scale(1); }
+  40% { filter: brightness(1.8) drop-shadow(0 0 8px rgb(var(--c-yellow))); transform: scale(1.35); }
+  100% { filter: brightness(1); transform: scale(1); }
+}
+.node-light { animation: light-up 0.9s ease-out both; transform-box: fill-box; transform-origin: center; }
+
+/* Spring entrance (#106): overshoot then settle — level-up / celebrate moments */
+@keyframes spring-in {
+  0% { transform: scale(0.6); opacity: 0; }
+  55% { transform: scale(1.08); opacity: 1; }
+  75% { transform: scale(0.96); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-spring { animation: spring-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes calm-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Calm mode (#106): every animation becomes a simple fade, mascots hide, loops stop */
+[data-calm="on"] .animate-pop,
+[data-calm="on"] .animate-spring,
+[data-calm="on"] .xp-pop,
+[data-calm="on"] .node-light { animation: calm-fade 0.25s ease-out both; }
+[data-calm="on"] .animate-pulse-dot { animation: none; }
+[data-calm="on"] [data-mascot] { display: none; }
+
+/* Reduced motion: simple fade instead of movement (issue #106 acceptance) */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pop, .animate-spring, .xp-pop, .node-light { animation: calm-fade 0.25s ease-out both !important; }
+}
+
+/* Printable pages (#104): exam-day playbook */
+@media print {
+  nav, header, .no-print { display: none !important; }
+  body { background: #fff !important; }
+  main { max-width: none !important; padding: 0 !important; }
+  .print-block { break-inside: avoid; }
+  /* Cheat-sheets (#113): one A4 page per subject */
+  .sheet-page { break-after: page; border: none !important; box-shadow: none !important; }
+  .sheet-page:last-child { break-after: auto; }
+}
+
+@page { size: A4; margin: 14mm; }
+
+/* Codex markdown */
+.md h1 { @apply mb-3 mt-6 font-display text-display-m uppercase; }
+.md h2 { @apply mb-2 mt-6 font-display text-title-l uppercase; }
+.md h3, .md h4 { @apply mb-2 mt-4 text-title-m font-extrabold; }
+.md p { @apply my-2 leading-7; }
+.md ul { @apply my-2 list-disc ps-6; }
+.md ol { @apply my-2 list-decimal ps-6; }
+.md li { @apply my-1; }
+.md a { @apply font-bold text-purple-ink underline; }
+.md code { @apply rounded bg-surface-2 px-1.5 py-0.5 text-[0.9em]; }
+.md pre { @apply my-3 overflow-x-auto rounded-2xl bg-surface-2 p-4 text-body-s; }
+.md pre code { @apply bg-transparent p-0; }
+.md blockquote { @apply my-3 rounded-2xl border-s-4 border-yellow bg-surface-2 px-4 py-2; }
+.md .md-table { @apply my-3 overflow-x-auto; }
+.md table { @apply w-full border-collapse text-body-s; }
+.md th, .md td { @apply border border-line px-3 py-1.5 text-start align-top; }
+.md th { @apply bg-surface-2 font-extrabold; }
+.md hr { @apply my-6 border-line; }

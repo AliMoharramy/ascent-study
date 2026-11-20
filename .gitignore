@@ -1,0 +1,28 @@
+node_modules/
+.next/
+.next-win/
+.env
+.env.*
+!.env.example
+*.db
+*.db-wal
+*.db-shm
+data/
+backups/
+# These are application routes, not generated backup data.
+!app/api/backups/
+!app/api/backups/**/
+!app/api/backups/**
+.DS_Store
+Thumbs.db
+next-env.d.ts
+*.tsbuildinfo
+coverage/
+vibe_images/
+# Private notes, scratch output and local tooling output (never publish)
+founder/
+undefined/
+tools/*.log
+*.log
+.claude/
+.vercel

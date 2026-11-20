@@ -1,0 +1,86 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ascent_test
+          POSTGRES_PASSWORD: local-test-only
+          POSTGRES_DB: ascent_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ascent_test -d ascent_test"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+    env:
+      TEST_DATABASE_URL: postgresql://ascent_test:local-test-only@127.0.0.1:5432/ascent_test
+      DISABLE_JOBS: "true"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Validate seed YAML
+        run: npm run seed:validate
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:pg
+      - name: Build without database credentials
+        run: npm run build
+      - name: Initial JS budget
+        run: npm run perf:budget
+      - name: Compose config is valid
+        run: DOMAIN=example.test docker compose config -q
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build runtime and explicit operator images
+        run: |
+          docker build --target tools -t the-ascent:tools .
+          docker build -t the-ascent:ci .
+      - name: PostgreSQL smoke test without cold-start migrations
+        run: |
+          docker network create ascent-ci
+          docker run -d --name ascent-pg --network ascent-ci \
+            -e POSTGRES_USER=ascent -e POSTGRES_PASSWORD=ci-only -e POSTGRES_DB=ascent \
+            --health-cmd='pg_isready -U ascent -d ascent' --health-interval=2s --health-retries=30 postgres:17-alpine
+          for i in $(seq 1 30); do
+            docker exec ascent-pg pg_isready -U ascent -d ascent && break
+            sleep 2
+          done
+          docker run --rm --network ascent-ci \
+            -e DIRECT_DATABASE_URL=postgresql://ascent:ci-only@ascent-pg/ascent \
+            the-ascent:tools npm run db:migrate
+          docker run --rm --network ascent-ci \
+            -e DATABASE_URL=postgresql://ascent:ci-only@ascent-pg/ascent \
+            the-ascent:tools npm run db:seed
+          docker run -d --name ascent --network ascent-ci -p 3000:3000 \
+            -e DATABASE_URL=postgresql://ascent:ci-only@ascent-pg/ascent \
+            -e COOKIE_SECURE=false -e DISABLE_JOBS=true the-ascent:ci
+          for i in $(seq 1 30); do curl -fsS localhost:3000/healthz && break; sleep 2; done
+          curl -fsS localhost:3000/healthz
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:3000/api/tests)" = "401"
+          curl -fsS localhost:3000/login | grep -q 'First-run setup'
+          test "$(docker exec ascent-pg psql -U ascent -d ascent -Atc 'SELECT count(*) FROM chapters')" = "93"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Page-level smoke test (first-run, login, every page, key APIs)
+        run: node scripts/smoke.mjs http://localhost:3000
+      - name: Stop isolated smoke containers
+        if: always()
+        run: docker rm -f ascent ascent-pg || true
