@@ -40,9 +40,9 @@ describe("postgres baseline (Database V2, S1)", () => {
     const names = rows.map((r) => r.table_name);
     expect(names).toContain("_migrations");
     for (const table of Object.keys(pgTables)) expect(names, table).toContain(table);
-    // 69 application tables + the migration journal
+    // 70 application tables + the migration journal
     expect(names.length).toBe(Object.keys(pgTables).length + 1);
-    expect(Object.keys(pgTables)).toHaveLength(69);
+    expect(Object.keys(pgTables)).toHaveLength(70);
   });
 
   it("records the applied version with its checksum", async () => {
@@ -50,9 +50,8 @@ describe("postgres baseline (Database V2, S1)", () => {
     const { rows } = await db.query<{ version: string; name: string; checksum: string }>(
       "SELECT version, name, checksum FROM _migrations ORDER BY version",
     );
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.version).toBe("0001_baseline");
-    expect(rows[0]!.checksum).toBe(loadPgMigrations()[0]!.checksum);
+    const migrations = loadPgMigrations();
+    expect(rows).toEqual(migrations.map(({ version, name, checksum }) => ({ version, name, checksum })));
   });
 
   it("is idempotent", async () => {
@@ -61,7 +60,7 @@ describe("postgres baseline (Database V2, S1)", () => {
     try {
       const result = await migratePgUp(client);
       expect(result.applied).toEqual([]);
-      expect(result.skipped).toEqual(["0001_baseline"]);
+      expect(result.skipped).toEqual(loadPgMigrations().map((migration) => migration.version));
     } finally {
       await client.end();
     }

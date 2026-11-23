@@ -6,8 +6,9 @@ DEV_DB_URL   = postgresql://ascent_dev:local-dev-only@127.0.0.1:$(PG_PORT)/ascen
 DEMO_DB_URL  = postgresql://ascent_dev:local-dev-only@127.0.0.1:$(PG_PORT)/ascent_demo
 DEMOENV = DATABASE_URL=$(DEMO_DB_URL) DIRECT_DATABASE_URL=$(DEMO_DB_URL) DISABLE_JOBS=true
 ENVQ = DATABASE_URL=$(DEV_DB_URL) DIRECT_DATABASE_URL=$(DEV_DB_URL) DISABLE_JOBS=true DEV_USER=$(DEV_USER) DEV_PASSWORD=$(DEV_PASSWORD)
+WIDGET_SCRIPT = desktop/windows-widget/manage-widget.ps1
 
-.PHONY: help dev demo login db-up db-stop prepare test test-pg lint typecheck build
+.PHONY: help dev demo login db-up db-stop prepare test test-pg lint typecheck build start stop
 
 help:
 	@echo "make dev        start local PostgreSQL, migrate, seed, then serve on port $(PORT)"
@@ -17,6 +18,8 @@ help:
 	@echo "make test       pure unit tests, no database needed"
 	@echo "make test-pg    integration tests against isolated PostgreSQL schemas"
 	@echo "make lint | typecheck | build"
+	@echo "make start      build and launch the Windows focus widget detached"
+	@echo "make stop       stop the Windows focus widget"
 
 node_modules: package.json package-lock.json
 	npm ci
@@ -60,3 +63,9 @@ typecheck: node_modules
 
 build: node_modules
 	npm run build
+
+start:
+	powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(WIDGET_SCRIPT)" -Action start
+
+stop:
+	powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(WIDGET_SCRIPT)" -Action stop

@@ -31,6 +31,7 @@ export const users = pgTable("users", {
   timezone: text("timezone").notNull().default("Asia/Tehran"),
   rolloverHour: integer("rollover_hour").notNull().default(4),
   theme: text("theme").notNull().default("night"),
+  shareTaskTitlesWithAi: boolean("share_task_titles_with_ai").notNull().default(false),
   failedLogins: integer("failed_logins").notNull().default(0),
   lockedUntil: ts("locked_until"),
   createdAt: ts("created_at").notNull(),
@@ -67,6 +68,7 @@ export const focusSessions = pgTable("focus_sessions", {
   userId: text("user_id").notNull(),
   subjectId: text("subject_id"),
   chapterId: text("chapter_id"),
+  taskTitle: text("task_title"),
   kind: text("kind").$type<FocusKind>().notNull(),
   status: text("status").$type<FocusStatus>().notNull(),
   startedAt: ts("started_at").notNull(),
@@ -81,6 +83,18 @@ export const focusSessions = pgTable("focus_sessions", {
   note: text("note"),
   createdAt: ts("created_at").notNull(),
   updatedAt: ts("updated_at").notNull(),
+});
+
+export type PersonalTaskStatus = "open" | "done";
+
+export const personalTasks = pgTable("personal_tasks", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  title: text("title").notNull(),
+  status: text("status").$type<PersonalTaskStatus>().notNull().default("open"),
+  createdAt: ts("created_at").notNull(),
+  updatedAt: ts("updated_at").notNull(),
+  completedAt: ts("completed_at"),
 });
 
 export const testLogs = pgTable("test_logs", {
@@ -920,6 +934,7 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
 /** Every table, keyed by its SQL name (used by the schema/DDL parity test). */
 export const pgTables = {
   users,
+  personal_tasks: personalTasks,
   auth_sessions: authSessions,
   events,
   focus_sessions: focusSessions,

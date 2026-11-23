@@ -1,0 +1,24 @@
+export component FocusTray inherits SystemTrayIcon {
+    callback show-widget();
+    callback hide-widget();
+    callback quit-widget();
+
+    icon: @image-url("../../../public/icons/icon-512.png");
+    tooltip: "Ascent Focus";
+    clicked => { root.show-widget(); }
+
+    Menu {
+        MenuItem {
+            title: "Show Ascent Focus";
+            activated => { root.show-widget(); }
+        }
+        MenuItem {
+            title: "Hide widget";
+            activated => { root.hide-widget(); }
+        }
+        MenuItem {
+            title: "Quit";
+            activated => { root.quit-widget(); }
+        }
+    }
+}

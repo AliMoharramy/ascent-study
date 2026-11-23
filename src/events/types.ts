@@ -113,6 +113,11 @@ export const EVENT_TYPES = [
   "sync.replay",
   "notify.sent",
   "final.breath",
+  // Focus widget personal tasks
+  "personal_task.created",
+  "personal_task.updated",
+  "personal_task.completed",
+  "personal_task.reopened",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];

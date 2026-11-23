@@ -5,7 +5,17 @@ import { withUserTransaction } from "@/db/client";
 import { api, body } from "@/server/http";
 import { nowIso } from "@/lib/ids";
 
-const input = z.object({ theme: z.enum(["night", "cream"]).optional(), locale: z.enum(["en", "fa"]).optional() });
+const input = z.object({
+  theme: z.enum(["night", "cream"]).optional(),
+  locale: z.enum(["en", "fa"]).optional(),
+  shareTaskTitlesWithAi: z.boolean().optional(),
+});
+
+export const GET = api(async ({ session }) => ({
+  theme: session.user.theme,
+  locale: session.user.locale,
+  shareTaskTitlesWithAi: session.user.shareTaskTitlesWithAi,
+}));
 
 export const PATCH = api(async ({ db, userId, req }) => {
   const b = input.parse(await body(req));

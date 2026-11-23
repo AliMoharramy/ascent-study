@@ -16,7 +16,7 @@ import { anomalyLog } from "./shop";
 
 /**
  * AI adapter (#92–#94). Remote calls happen only when flags.ai + env AI_KEY + baseUrl are all set;
- * every request passes the privacy guard (aggregates only) and the monthly cost / daily call caps.
+ * every request passes privacy and cost guards; task titles are included only after explicit user opt-in.
  * With AI off the deterministic local provider returns the same zod-validated shapes — the app never blocks on AI.
  * The key lives ONLY in env AI_KEY, never in the config DB or backups.
  */
@@ -56,7 +56,7 @@ export function aiRequestTimeoutMs(value = process.env.AI_TIMEOUT_MS): number {
 }
 
 /** One guarded, capped, logged remote attempt. Returns null when AI is off, capped, or fails — callers fall back to local. */
-export async function remoteCall<T>(db: Db, userId: string, purpose: string, system: string, user: string, schema: z.ZodType<T>, today: string): Promise<{ value: T; cost: number } | null> {
+export async function remoteCall<T>(db: Db, userId: string, purpose: string, system: string, user: string, schema: z.ZodType<T>, today: string, requestSummary = `${purpose}: numeric aggregates only (guard)`): Promise<{ value: T; cost: number } | null> {
   const st = (await aiStatus(db, userId, today));
   if (!st.remoteReady) return null;
   if (st.callsToday >= st.maxCallsPerDay || st.monthCost >= st.monthCap) return null;
@@ -80,7 +80,7 @@ export async function remoteCall<T>(db: Db, userId: string, purpose: string, sys
     const tokensIn = json.usage?.prompt_tokens ?? tokensInEst;
     const tokensOut = json.usage?.completion_tokens ?? Math.ceil(content.length / 4);
     const cost = estimateCost(tokensIn, tokensOut, cfg.ai);
-    (await logCall(db, userId, purpose, "remote", st.model, tokensIn, tokensOut, cost, `${purpose}: numeric aggregates only (guard)`, value));
+    (await logCall(db, userId, purpose, "remote", st.model, tokensIn, tokensOut, cost, requestSummary, value));
     return { value, cost };
   } catch (e) {
     (await logCall(db, userId, purpose, "remote", st.model, 0, 0, 0, `${purpose}: failed attempt`, { error: e instanceof Error ? e.message : String(e) }));

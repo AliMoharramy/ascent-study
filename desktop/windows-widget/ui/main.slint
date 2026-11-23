@@ -1,0 +1,747 @@
+export { FocusTray } from "tray.slint";
+
+export struct TaskItem {
+    id: string,
+    title: string,
+    detail: string,
+    source: string,
+    done: bool,
+    can-complete: bool,
+}
+
+export global WidgetMotion {
+    in-out property <int> animation-duration: 180;
+}
+
+component ActionButton inherits FocusScope {
+    in property <string> label;
+    in property <string> accessible-name: root.label;
+    in property <bool> primary: false;
+    in property <bool> selected: false;
+    in property <bool> disabled: false;
+    callback activated();
+
+    width: 100px;
+    height: 34px;
+    accessible-role: button;
+    accessible-label: root.accessible-name;
+    accessible-action-default => { if (!root.disabled) { root.activated(); } }
+
+    Rectangle {
+        border-radius: 11px;
+        border-width: 1px;
+        border-color: root.has-focus ? #9df2d7 : (root.primary ? #8ce7cd : #ffffff1b);
+        background: root.disabled ? #ffffff08 : (root.primary ? #8ce7cd : (root.selected ? #31404d : #ffffff0b));
+        animate background, border-color { duration: WidgetMotion.animation-duration * 1ms; easing: ease-out; }
+
+        Text {
+            text: root.label;
+            color: root.disabled ? #8799a4 : (root.primary ? #172722 : #e6edf4);
+            font-size: 11px;
+            font-weight: 650;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            width: parent.width;
+            height: parent.height;
+        }
+    }
+
+    TouchArea {
+        width: root.width;
+        height: root.height;
+        clicked => {
+            if (!root.disabled) {
+                root.focus();
+                root.activated();
+            }
+        }
+    }
+    KeyBinding { keys: @keys(Return); activated => { if (!root.disabled) { root.activated(); } } }
+    KeyBinding { keys: @keys(Space); activated => { if (!root.disabled) { root.activated(); } } }
+}
+
+component TimerCapsule inherits FocusScope {
+    in property <string> timer-label;
+    in property <string> task-label;
+    callback activated();
+    callback move-window();
+    private property <bool> drag-started: false;
+
+    width: root.task-label == "" ? 104px : 218px;
+    height: 44px;
+    accessible-role: button;
+    accessible-label: "Open Ascent focus timer";
+    accessible-description: root.task-label == "" ? "Current timer " + root.timer-label : "Current timer " + root.timer-label + ". Current task " + root.task-label;
+    accessible-action-default => { root.activated(); }
+
+    Rectangle {
+        border-radius: 14px;
+        border-width: 1px;
+        border-color: root.has-focus ? #8ce7cd : #ffffff35;
+        background: #17232dec;
+        animate border-color { duration: WidgetMotion.animation-duration * 1ms; easing: ease-out; }
+
+        Text {
+            x: 8px;
+            y: 0px;
+            width: 54px;
+            height: parent.height;
+            text: root.timer-label;
+            color: #edf6f2;
+            font-size: 13px;
+            font-weight: 650;
+            font-family: "Consolas";
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+
+        Text {
+            x: 67px;
+            y: 0px;
+            width: parent.width - 113px;
+            height: parent.height;
+            text: root.task-label;
+            color: #a9c7bf;
+            font-size: 10px;
+            font-weight: 500;
+            overflow: elide;
+            vertical-alignment: center;
+        }
+
+        Tooltip {
+            Text {
+                text: root.task-label;
+            }
+        }
+
+        Rectangle {
+            x: parent.width - 34px;
+            y: 9px;
+            width: 26px;
+            height: 26px;
+            border-radius: 13px;
+            border-width: 1px;
+            border-color: #ffffff;
+            background: #ffffff;
+            Image {
+                x: 4px;
+                y: 4px;
+                width: parent.width - 8px;
+                height: parent.height - 8px;
+                source: @image-url("../../../public/icons/icon-512.png");
+                image-fit: contain;
+                accessible-role: none;
+            }
+        }
+    }
+
+    TouchArea {
+        width: root.width;
+        height: root.height;
+        mouse-cursor: move;
+        changed pressed => { if (self.pressed) { root.drag-started = false; } }
+        moved => {
+            if (!root.drag-started && ((self.mouse-x - self.pressed-x > 6px) || (self.mouse-x - self.pressed-x < -6px) || (self.mouse-y - self.pressed-y > 6px) || (self.mouse-y - self.pressed-y < -6px))) {
+                root.drag-started = true;
+                root.move-window();
+            }
+        }
+        clicked => {
+            root.focus();
+            if (!root.drag-started) { root.activated(); }
+        }
+    }
+    KeyBinding { keys: @keys(Return); activated => { root.activated(); } }
+    KeyBinding { keys: @keys(Space); activated => { root.activated(); } }
+}
+
+component TaskRow inherits Rectangle {
+    in property <TaskItem> task;
+    in property <bool> busy: false;
+    callback work(string, string);
+    callback finish(string, string);
+
+    width: 338px;
+    height: 58px;
+    border-radius: 13px;
+    border-width: 1px;
+    border-color: #ffffff12;
+    background: #ffffff07;
+
+    Text {
+        x: 12px;
+        y: 8px;
+        width: 198px;
+        height: 20px;
+        text: root.task.title;
+        color: root.task.done ? #81918f : #edf3f5;
+        font-size: 11px;
+        font-weight: 650;
+        overflow: elide;
+    }
+    Text {
+        x: 12px;
+        y: 30px;
+        width: 198px;
+        height: 16px;
+        text: root.task.detail;
+        color: #8fa1ab;
+        font-size: 9px;
+        overflow: elide;
+    }
+
+    ActionButton {
+        x: parent.width - 119px;
+        y: 12px;
+        width: 54px;
+        height: 32px;
+        label: root.task.done ? "Done" : (root.task.can-complete ? "Finish" : "Auto");
+        disabled: root.busy || root.task.done || !root.task.can-complete;
+        activated => { root.finish(root.task.id, root.task.source); }
+    }
+    ActionButton {
+        x: parent.width - 59px;
+        y: 12px;
+        width: 51px;
+        height: 32px;
+        label: "Work";
+        primary: true;
+        disabled: root.busy || root.task.done;
+        activated => { root.work(root.task.id, root.task.source); }
+    }
+}
+
+export component FocusWidget inherits Window {
+    in-out property <bool> panel-open: false;
+    in-out property <bool> tasks-open: false;
+    in-out property <bool> session-running: false;
+    in-out property <bool> session-active: false;
+    in-out property <bool> busy: false;
+    in-out property <bool> signed-in: false;
+    in-out property <bool> backdrop-supported: false;
+    in-out property <bool> share-task-titles-with-ai: false;
+    in-out property <int> remaining-seconds: 1500;
+    in-out property <string> timer-text: "25:00";
+    in-out property <string> active-task-title: "";
+    in-out property <string> status-text: "Sign in to sync your focus";
+    in-out property <string> account-status: "Not connected";
+    in-out property <string> selected-source: "Today";
+    in-out property <string> server-url: "";
+    in-out property <string> username: "";
+    in-out property <string> password: "";
+    in-out property <string> task-title: "";
+    in-out property <string> message: "";
+    in-out property <string> suggestion-title: "";
+    in-out property <string> suggestion-reason: "";
+    in-out property <string> suggestion-minutes: "25 min";
+    in-out property <string> suggestion-provider: "";
+    in-out property <bool> has-suggestion: false;
+    in-out property <bool> has-tasks: false;
+    in-out property <int> task-content-height: 0;
+    in-out property <[TaskItem]> tasks: [];
+    private property <bool> panel-drag-started: false;
+
+    callback toggle-focus();
+    callback finish-focus();
+    callback tick();
+    callback reconcile-focus();
+    callback login();
+    callback logout();
+    callback refresh();
+    callback start-task(string, string);
+    callback complete-task(string, string);
+    callback create-task(string);
+    callback suggest-task();
+    callback add-suggestion();
+    callback work-suggestion();
+    callback set-title-sharing(bool);
+    callback change-source(string);
+    callback move-window();
+
+    title: "Ascent Focus";
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+    width: root.panel-open ? 374px : (root.active-task-title == "" ? 104px : 218px);
+    height: root.panel-open ? (root.tasks-open ? 752px : 286px) : 44px;
+    animate width, height { duration: WidgetMotion.animation-duration * 1ms; easing: ease-out; }
+
+    Timer {
+        interval: 1s;
+        running: root.session-running;
+        triggered => { root.tick(); }
+    }
+
+    Timer {
+        interval: 30s;
+        running: root.signed-in;
+        triggered => { root.reconcile-focus(); }
+    }
+
+    if !root.panel-open: TimerCapsule {
+        x: 0px;
+        y: 0px;
+        timer-label: root.timer-text;
+        task-label: root.active-task-title;
+        activated => { root.panel-open = true; }
+        move-window => { root.move-window(); }
+    }
+
+    if root.panel-open: Rectangle {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        border-radius: 25px;
+        border-width: 1px;
+        border-color: #ffffff2e;
+        background: root.backdrop-supported ? #18232ddb : #18232df2;
+        animate opacity { duration: WidgetMotion.animation-duration * 1ms; easing: ease-out; }
+
+        Rectangle {
+            x: 1px;
+            y: 1px;
+            width: parent.width - 2px;
+            height: parent.height - 2px;
+            border-radius: 24px;
+            background: #ffffff06;
+        }
+
+        Rectangle {
+            x: 18px;
+            y: 16px;
+            width: 34px;
+            height: 34px;
+            border-radius: 17px;
+            border-width: 1px;
+            border-color: #ffffff;
+            background: #ffffff;
+            Image {
+                x: 5px;
+                y: 5px;
+                width: parent.width - 10px;
+                height: parent.height - 10px;
+                source: @image-url("../../../public/icons/icon-512.png");
+                image-fit: contain;
+                accessible-role: none;
+            }
+        }
+        Text {
+            x: 62px;
+            y: 15px;
+            text: "ASCENT";
+            color: #eef3f7;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1.1px;
+        }
+        Text {
+            x: 62px;
+            y: 32px;
+            text: root.signed-in ? root.account-status : "FOCUS TIMER";
+            color: #95a6b0;
+            font-size: 9px;
+            letter-spacing: 0.3px;
+            overflow: elide;
+            width: 214px;
+        }
+        TouchArea {
+            x: 0px;
+            y: 0px;
+            width: parent.width - 66px;
+            height: 56px;
+            mouse-cursor: move;
+            changed pressed => { if (self.pressed) { root.panel-drag-started = false; } }
+            moved => {
+                if (!root.panel-drag-started && ((self.mouse-x - self.pressed-x > 6px) || (self.mouse-x - self.pressed-x < -6px) || (self.mouse-y - self.pressed-y > 6px) || (self.mouse-y - self.pressed-y < -6px))) {
+                    root.panel-drag-started = true;
+                    root.move-window();
+                }
+            }
+        }
+        ActionButton {
+            x: parent.width - 55px;
+            y: 16px;
+            width: 36px;
+            height: 34px;
+            label: "×";
+            accessible-name: "Close timer panel";
+            activated => { root.tasks-open = false; root.panel-open = false; }
+        }
+
+        Rectangle {
+            x: 16px;
+            y: 60px;
+            width: parent.width - 32px;
+            height: 137px;
+            border-radius: 18px;
+            border-width: 1px;
+            border-color: #9fe6d126;
+            background: #8ce7cd12;
+
+            Rectangle {
+                x: 15px;
+                y: 21px;
+                width: 86px;
+                height: 86px;
+                border-radius: 44px;
+                border-width: 3px;
+                border-color: root.session-running ? #8ce7cdcc : #8ce7cd66;
+                background: #18252c;
+                animate border-color { duration: WidgetMotion.animation-duration * 1ms; easing: ease-out; }
+                Text {
+                    text: "◷";
+                    color: #b6f3df;
+                    font-size: 28px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    width: parent.width;
+                    height: parent.height;
+                }
+            }
+            Text {
+                x: 117px;
+                y: 16px;
+                width: parent.width - 130px;
+                text: root.status-text;
+                color: #a9d4c9;
+                font-size: 10px;
+                font-weight: 600;
+                overflow: elide;
+            }
+            Text {
+                x: 117px;
+                y: 37px;
+                width: parent.width - 130px;
+                text: root.timer-text;
+                color: #f2f7f6;
+                font-size: 30px;
+                font-weight: 540;
+                font-family: "Segoe UI";
+            }
+            Text {
+                x: 117px;
+                y: 75px;
+                width: parent.width - 130px;
+                height: 23px;
+                text: root.active-task-title != "" ? root.active-task-title : (root.session-active ? "Synced with your Ascent account" : "A 25-minute focus block");
+                color: #9aaab5;
+                font-size: 9px;
+                wrap: word-wrap;
+                overflow: elide;
+            }
+            ActionButton {
+                x: 117px;
+                y: 101px;
+                width: 103px;
+                height: 30px;
+                label: !root.signed-in ? "Sign in" : (root.session-running ? "Pause" : (root.session-active ? "Resume" : "Start focus"));
+                primary: true;
+                disabled: root.busy;
+                activated => {
+                    if (root.signed-in) { root.toggle-focus(); }
+                    else { root.tasks-open = true; }
+                }
+            }
+            ActionButton {
+                x: 226px;
+                y: 101px;
+                width: 86px;
+                height: 30px;
+                label: "Finish";
+                disabled: root.busy || !root.session-active;
+                activated => { root.finish-focus(); }
+            }
+        }
+
+        ActionButton {
+            x: 16px;
+            y: 207px;
+            width: parent.width - 32px;
+            height: 49px;
+            label: root.tasks-open ? "Hide tasks     ↑" : "Open task list     ↓";
+            selected: root.tasks-open;
+            disabled: root.busy;
+            activated => {
+                if (root.tasks-open) {
+                    root.tasks-open = false;
+                } else {
+                    root.tasks-open = true;
+                    if (root.signed-in) { root.refresh(); }
+                }
+            }
+        }
+
+        if root.tasks-open: Rectangle {
+            x: 16px;
+            y: 266px;
+            width: parent.width - 32px;
+            height: parent.height - 282px;
+            border-radius: 17px;
+            border-width: 1px;
+            border-color: #ffffff18;
+            background: #111b25;
+
+            if !root.signed-in: Rectangle {
+                x: 0px;
+                y: 0px;
+                width: parent.width;
+                height: parent.height;
+                border-radius: 17px;
+                background: #101923;
+                Text {
+                    x: 18px;
+                    y: 16px;
+                    text: "Connect to Ascent";
+                    color: #eaf2f5;
+                    font-size: 16px;
+                    font-weight: 650;
+                }
+                Text {
+                    x: 18px;
+                    y: 42px;
+                    width: parent.width - 36px;
+                    text: "Sign in to sync focus, courses, and personal tasks.";
+                    color: #93a4af;
+                    font-size: 10px;
+                    wrap: word-wrap;
+                }
+                Text { x: 19px; y: 83px; text: "SERVER URL"; color: #91a4af; font-size: 9px; font-weight: 650; }
+                Rectangle {
+                    x: 18px; y: 101px; width: parent.width - 36px; height: 38px;
+                    border-radius: 10px; border-width: 1px; border-color: #ffffff1a; background: #ffffff08;
+                    if root.server-url == "": Text {
+                        x: 10px; y: 0px; width: parent.width - 20px; height: parent.height;
+                        text: "https://your-ascent-server";
+                        color: #81939d; font-size: 11px; vertical-alignment: center;
+                    }
+                    TextInput {
+                        x: 10px; y: 0px; width: parent.width - 20px; height: parent.height;
+                        text <=> root.server-url;
+                        accessible-label: "Server URL";
+                        color: #e8f0f4; font-size: 11px; vertical-alignment: center;
+                    }
+                }
+                Text { x: 19px; y: 151px; text: "USERNAME"; color: #91a4af; font-size: 9px; font-weight: 650; }
+                Rectangle {
+                    x: 18px; y: 169px; width: parent.width - 36px; height: 38px;
+                    border-radius: 10px; border-width: 1px; border-color: #ffffff1a; background: #ffffff08;
+                    if root.username == "": Text {
+                        x: 10px; y: 0px; width: parent.width - 20px; height: parent.height;
+                        text: "Ascent username";
+                        color: #81939d; font-size: 11px; vertical-alignment: center;
+                    }
+                    TextInput {
+                        x: 10px; y: 0px; width: parent.width - 20px; height: parent.height;
+                        text <=> root.username;
+                        accessible-label: "Ascent username";
+                        color: #e8f0f4; font-size: 11px; vertical-alignment: center;
+                    }
+                }
+                Text { x: 19px; y: 219px; text: "PASSWORD"; color: #91a4af; font-size: 9px; font-weight: 650; }
+                Rectangle {
+                    x: 18px; y: 237px; width: parent.width - 36px; height: 38px;
+                    border-radius: 10px; border-width: 1px; border-color: #ffffff1a; background: #ffffff08;
+                    if root.password == "": Text {
+                        x: 10px; y: 0px; width: parent.width - 20px; height: parent.height;
+                        text: "Account password";
+                        color: #81939d; font-size: 11px; vertical-alignment: center;
+                    }
+                    TextInput {
+                        x: 10px; y: 0px; width: parent.width - 20px; height: parent.height;
+                        text <=> root.password;
+                        accessible-label: "Ascent password";
+                        input-type: InputType.password;
+                        color: #e8f0f4; font-size: 11px; vertical-alignment: center;
+                        accepted => { root.login(); }
+                    }
+                }
+                ActionButton {
+                    x: 18px; y: 293px; width: parent.width - 36px; height: 42px;
+                    label: root.busy ? "Connecting…" : "Sign in securely";
+                    primary: true; disabled: root.busy;
+                    activated => { root.login(); }
+                }
+                Text {
+                    x: 18px; y: 344px; width: parent.width - 36px; height: 60px;
+                    text: root.message;
+                    color: #c8d6db; font-size: 10px; wrap: word-wrap;
+                    vertical-alignment: top;
+                }
+                Text {
+                    x: 18px; y: parent.height - 39px; width: parent.width - 36px; height: 30px;
+                    text: "Remote servers require HTTPS. Passwords are never saved.";
+                    color: #889ca7; font-size: 9px; wrap: word-wrap;
+                }
+            }
+
+            if root.signed-in: Rectangle {
+                x: 0px;
+                y: 0px;
+                width: parent.width;
+                height: parent.height;
+                border-radius: 17px;
+                background: #101923;
+
+                Text {
+                    x: 15px; y: 12px; text: "YOUR TASKS";
+                    color: #91a4af; font-size: 9px; font-weight: 650; letter-spacing: 1px;
+                }
+                ActionButton {
+                    x: parent.width - 139px; y: 5px; width: 58px; height: 27px;
+                    label: "Sign out"; disabled: root.busy;
+                    activated => { root.logout(); }
+                }
+                ActionButton {
+                    x: parent.width - 76px; y: 5px; width: 61px; height: 27px;
+                    label: "Refresh"; disabled: root.busy;
+                    activated => { root.refresh(); }
+                }
+                ActionButton {
+                    x: 12px; y: 37px; width: 106px; height: 33px;
+                    label: "Today"; selected: root.selected-source == "Today";
+                    disabled: root.busy;
+                    activated => { root.selected-source = "Today"; root.change-source("Today"); }
+                }
+                ActionButton {
+                    x: 124px; y: 37px; width: 106px; height: 33px;
+                    label: "Courses"; selected: root.selected-source == "Courses";
+                    disabled: root.busy;
+                    activated => { root.selected-source = "Courses"; root.change-source("Courses"); }
+                }
+                ActionButton {
+                    x: 236px; y: 37px; width: 106px; height: 33px;
+                    label: "Mine"; selected: root.selected-source == "Mine";
+                    disabled: root.busy;
+                    activated => { root.selected-source = "Mine"; root.change-source("Mine"); }
+                }
+
+                if root.selected-source == "Today": Rectangle {
+                    x: 10px; y: 78px; width: parent.width - 20px; height: 100px;
+                    border-radius: 14px; border-width: 1px; border-color: #91e4cb24; background: #79ddbc0c;
+                    Text {
+                        x: 12px; y: 10px; width: 181px; height: 33px;
+                        text: root.has-suggestion ? root.suggestion-title : "Ask AI for a small next step";
+                        color: #e2f0ed; font-size: 11px; font-weight: 650; overflow: elide;
+                    }
+                    Text {
+                        x: 12px; y: 43px; width: 181px; height: 34px;
+                        text: root.has-suggestion ? root.suggestion-reason : "Uses your tasks only after you turn on title sharing.";
+                        color: #93aaa5; font-size: 9px; wrap: word-wrap; overflow: elide;
+                    }
+                    Text {
+                        x: 12px; y: 78px; width: 181px; height: 13px;
+                        text: root.has-suggestion ? root.suggestion-minutes : "";
+                        color: #8ce7cd; font-size: 9px; font-weight: 650;
+                    }
+                    ActionButton {
+                        x: parent.width - 112px; y: 11px; width: 99px; height: 29px;
+                        label: root.busy ? "Thinking…" : "Suggest";
+                        primary: true; disabled: root.busy;
+                        activated => { root.suggest-task(); }
+                    }
+                    ActionButton {
+                        x: parent.width - 112px; y: 47px; width: 47px; height: 29px;
+                        label: "Work"; disabled: root.busy || !root.has-suggestion || root.session-active;
+                        activated => { root.work-suggestion(); }
+                    }
+                    ActionButton {
+                        x: parent.width - 59px; y: 47px; width: 47px; height: 29px;
+                        label: "Add"; disabled: root.busy || !root.has-suggestion;
+                        activated => { root.add-suggestion(); }
+                    }
+                }
+
+                if root.selected-source == "Today": ActionButton {
+                    x: 11px; y: 184px; width: parent.width - 22px; height: 31px;
+                    label: root.share-task-titles-with-ai ? "AI titles: On · click to turn off" : "AI titles: Off · click to opt in";
+                    selected: root.share-task-titles-with-ai; disabled: root.busy;
+                    activated => { root.set-title-sharing(!root.share-task-titles-with-ai); }
+                }
+                if root.selected-source == "Today": Text {
+                    x: 15px; y: 218px; width: parent.width - 30px; height: 22px;
+                    text: root.share-task-titles-with-ai ? "When on, task titles can be sent to your configured AI provider." : "Off sends only task counts and focus minutes to AI.";
+                    color: #8197a1; font-size: 9px; wrap: word-wrap;
+                }
+
+                if root.selected-source == "Mine": Rectangle {
+                    x: 10px; y: 80px; width: parent.width - 20px; height: 40px;
+                    border-radius: 11px; border-width: 1px; border-color: #ffffff1a; background: #ffffff08;
+                    if root.task-title == "": Text {
+                        x: 10px; y: 0px; width: parent.width - 94px; height: parent.height;
+                        text: "Add a personal task";
+                        color: #81939d; font-size: 10px; vertical-alignment: center;
+                    }
+                    TextInput {
+                        x: 10px; y: 0px; width: parent.width - 94px; height: parent.height;
+                        text <=> root.task-title; accessible-label: "New personal task title";
+                        color: #e8f0f4; font-size: 10px; vertical-alignment: center;
+                        accepted => { root.create-task(root.task-title); }
+                    }
+                    ActionButton {
+                        x: parent.width - 77px; y: 5px; width: 70px; height: 30px;
+                        label: "Add task"; primary: true; disabled: root.busy;
+                        activated => { root.create-task(root.task-title); }
+                    }
+                }
+
+                Text {
+                    x: 14px;
+                    y: root.selected-source == "Today" ? 241px : (root.selected-source == "Mine" ? 129px : 82px);
+                    width: parent.width - 28px;
+                    height: 22px;
+                    text: root.message != "" ? root.message : (root.selected-source == "Today" ? "TODAY · FOCUS AND HABITS" : (root.selected-source == "Courses" ? "COURSE LESSONS" : "PERSONAL TASKS"));
+                    color: #80949e;
+                    font-size: 9px;
+                    font-weight: 650;
+                    letter-spacing: 0.5px;
+                    overflow: elide;
+                }
+
+                Flickable {
+                    x: 10px;
+                    y: root.selected-source == "Today" ? 260px : (root.selected-source == "Mine" ? 149px : 102px);
+                    width: parent.width - 20px;
+                    height: root.selected-source == "Today" ? parent.height - 270px : (root.selected-source == "Mine" ? parent.height - 159px : parent.height - 112px);
+                    content-width: parent.width - 20px;
+                    content-height: root.task-content-height * 1px;
+
+                    for task[index] in root.tasks: TaskRow {
+                        x: 0px;
+                        y: index * 63px;
+                        width: parent.width;
+                        task: task;
+                        busy: root.busy;
+                        work(id, source) => { root.start-task(id, source); }
+                        finish(id, source) => { root.complete-task(id, source); }
+                    }
+                }
+
+                if !root.has-tasks: Text {
+                    x: 18px;
+                    y: root.selected-source == "Today" ? 278px : (root.selected-source == "Mine" ? 169px : 122px);
+                    width: parent.width - 36px;
+                    height: 65px;
+                    text: root.busy ? "Syncing your Ascent tasks…" : "No open tasks here. Add one in Mine or refresh.";
+                    color: #8799a4;
+                    font-size: 10px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        Text {
+            x: 16px;
+            y: parent.height - 22px;
+            width: parent.width - 32px;
+            height: 14px;
+            text: root.message != "" ? root.message : (root.signed-in ? "SYNCED · " + root.account-status : "SIGN IN TO SYNC YOUR ACCOUNT");
+            color: #889ca7;
+            font-size: 9px;
+            horizontal-alignment: center;
+            overflow: elide;
+        }
+    }
+}

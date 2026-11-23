@@ -14,6 +14,7 @@ export const FOCUS_KINDS = ["video", "tests", "review", "analysis", "forge", "ot
 export const startFocusInput = z.object({
   subjectId: z.string().max(40).nullish(),
   chapterId: z.string().max(60).nullish(),
+  taskTitle: z.string().trim().min(1).max(200).nullish(),
   kind: z.enum(FOCUS_KINDS).default("other"),
   surge: z.boolean().optional(),
   note: z.string().max(500).nullish(),
@@ -29,6 +30,7 @@ export interface FocusView {
   kind: FocusKind;
   subjectId: string | null;
   chapterId: string | null;
+  taskTitle: string | null;
   status: Row["status"];
   startedAt: string;
   pausedAt: string | null;
@@ -47,6 +49,7 @@ export function view(r: Row, now = new Date()): FocusView {
     kind: r.kind,
     subjectId: r.subjectId,
     chapterId: r.chapterId,
+    taskTitle: r.taskTitle,
     status: r.status,
     startedAt: r.startedAt,
     pausedAt: r.pausedAt,
@@ -98,6 +101,7 @@ export async function startFocus(db: Db, userId: string, input: z.input<typeof s
       userId,
       subjectId: data.subjectId ?? null,
       chapterId: data.chapterId ?? null,
+      taskTitle: data.taskTitle ?? null,
       kind: data.kind,
       status: s.status,
       startedAt: s.startedAt,
