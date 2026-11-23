@@ -9,6 +9,7 @@ slint::include_modules!();
 use api::{ApiClient, ApiError, FocusSession, TaskSource, WidgetTask};
 use credentials::SessionCredential;
 use slint::{ModelRc, VecModel};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use uuid::Uuid;
@@ -22,6 +23,8 @@ struct AppState {
     focus: Option<FocusSession>,
     tasks: Vec<WidgetTask>,
     pending_task_creation: Option<PendingTaskCreation>,
+    pending_task_completions: HashMap<String, String>,
+    last_refresh_error: Option<String>,
 }
 
 struct PendingTaskCreation {
@@ -163,6 +166,29 @@ fn finish_task_creation(state: &SharedState, request_id: &str) {
     }
 }
 
+fn task_completion_request_id(state: &SharedState, task_id: &str) -> String {
+    if let Ok(mut shared) = state.lock() {
+        return shared
+            .pending_task_completions
+            .entry(task_id.to_string())
+            .or_insert_with(|| Uuid::new_v4().to_string())
+            .clone();
+    }
+    Uuid::new_v4().to_string()
+}
+
+fn finish_task_completion(state: &SharedState, task_id: &str, request_id: &str) {
+    if let Ok(mut shared) = state.lock() {
+        if shared
+            .pending_task_completions
+            .get(task_id)
+            .is_some_and(|pending| pending == request_id)
+        {
+            shared.pending_task_completions.remove(task_id);
+        }
+    }
+}
+
 fn submit_personal_task(
     weak: slint::Weak<FocusWidget>,
     state: SharedState,
@@ -296,6 +322,7 @@ fn refresh_from_server(weak: slint::Weak<FocusWidget>, state: SharedState, inclu
             };
             match result {
                 Ok((focus, tasks)) => {
+                    clear_recovered_refresh_error(&ui, &state);
                     apply_focus(&ui, &state, focus);
                     if let Some((tasks, preferences)) = tasks {
                         if let Ok(mut shared) = state.lock() {
@@ -310,12 +337,44 @@ fn refresh_from_server(weak: slint::Weak<FocusWidget>, state: SharedState, inclu
                     }
                 }
                 Err(error) if include_tasks || error.unauthorized => {
-                    auth_error(&ui, &state, &error)
+                    if !error.unauthorized {
+                        let message = refresh_error_message(&error.message);
+                        remember_refresh_error(&state, &message);
+                        auth_error(&ui, &state, &error);
+                        ui.set_message(message.into());
+                    } else {
+                        auth_error(&ui, &state, &error);
+                    }
                 }
-                Err(error) => ui.set_message(error.message.into()),
+                Err(error) => {
+                    let message = refresh_error_message(&error.message);
+                    remember_refresh_error(&state, &message);
+                    ui.set_message(message.into());
+                }
             }
         });
     });
+}
+
+fn remember_refresh_error(state: &SharedState, message: &str) {
+    if let Ok(mut shared) = state.lock() {
+        shared.last_refresh_error = Some(message.to_string());
+    }
+}
+
+fn refresh_error_message(message: &str) -> String {
+    format!("Connection sync paused: {message}")
+}
+
+fn clear_recovered_refresh_error(ui: &FocusWidget, state: &SharedState) {
+    let error = state
+        .lock()
+        .ok()
+        .and_then(|mut shared| shared.last_refresh_error.take());
+    let current_message = ui.get_message().to_string();
+    if error.as_deref() == Some(current_message.as_str()) {
+        ui.set_message("".into());
+    }
 }
 
 #[cfg(windows)]
@@ -723,6 +782,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ui.set_message("This item is completed by recorded focus or tests.".into());
                 return;
             }
+            let request_id = task_completion_request_id(&state, &task.id);
+            let task_id = task.id.clone();
             ui.set_busy(true);
             ui.set_message("Saving completion to Ascent…".into());
             let (server_url, credential) = snapshot(&state);
@@ -735,7 +796,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         unauthorized: false,
                     })
                     .and_then(|client| {
-                        client.complete_task(&task)?;
+                        client.complete_task(&task, &request_id)?;
                         client.load_tasks()
                     });
                 let _ = slint::invoke_from_event_loop(move || {
@@ -744,6 +805,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
                     match result {
                         Ok((tasks, preferences)) => {
+                            finish_task_completion(&state, &task_id, &request_id);
                             if let Ok(mut shared) = state.lock() {
                                 shared.tasks = tasks;
                             }

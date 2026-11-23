@@ -445,7 +445,11 @@ impl ApiClient {
         Ok((tasks, preferences))
     }
 
-    pub fn complete_task(&self, task: &WidgetTask) -> Result<(), ApiError> {
+    pub fn complete_task(
+        &self,
+        task: &WidgetTask,
+        client_request_id: &str,
+    ) -> Result<(), ApiError> {
         let (method, path, body) = match task.source {
             TaskSource::Today => (
                 Method::POST,
@@ -460,7 +464,7 @@ impl ApiClient {
             TaskSource::Mine => (
                 Method::PATCH,
                 format!("api/personal-tasks/{}", task.id),
-                json!({"status":"done"}),
+                json!({"status":"done", "clientRequestId": client_request_id}),
             ),
             TaskSource::Ai => {
                 return Err(ApiError {

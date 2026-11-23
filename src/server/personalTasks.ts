@@ -13,7 +13,8 @@ export const createPersonalTaskInput = z.object({
 export const updatePersonalTaskInput = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   status: z.enum(["open", "done"]).optional(),
-}).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
+  clientRequestId: z.string().min(1).max(80),
+}).strict().refine((value) => value.title !== undefined || value.status !== undefined, "At least one field is required");
 
 export async function listPersonalTasks(db: Db, userId: string) {
   return await db.select().from(personalTasks)
@@ -48,8 +49,23 @@ export async function createPersonalTask(db: Db, userId: string, input: unknown)
 }
 
 export async function updatePersonalTask(db: Db, userId: string, taskId: string, input: unknown) {
-  const changes = updatePersonalTaskInput.parse(input);
+  const { clientRequestId, ...changes } = updatePersonalTaskInput.parse(input);
+  const request = { taskId, ...changes };
+  const type = changes.status === "done"
+    ? "personal_task.completed"
+    : changes.status === "open"
+      ? "personal_task.reopened"
+      : "personal_task.updated";
+
   return await withUserTransaction(db, userId, async (tx) => {
+    const prior = await replayOf(tx, userId, type, clientRequestId, request);
+    if (prior) {
+      const original = (await tx.select().from(personalTasks)
+        .where(and(eq(personalTasks.id, taskId), eq(personalTasks.userId, userId))).limit(1))[0];
+      if (!original) throw new EventRequestConflict();
+      return original;
+    }
+
     const current = (await tx.select().from(personalTasks)
       .where(and(eq(personalTasks.id, taskId), eq(personalTasks.userId, userId))).limit(1))[0];
     if (!current) throw new Error("Unknown personal task");
@@ -58,25 +74,25 @@ export async function updatePersonalTask(db: Db, userId: string, taskId: string,
     const title = changes.title ?? current.title;
     const status = changes.status ?? current.status;
     const completedAt = status === "done" ? (current.completedAt ?? now) : null;
+    const changed = current.title !== title || current.status !== status;
     const updated = {
       ...current,
       title,
       status,
       completedAt,
-      updatedAt: now,
+      updatedAt: changed ? now : current.updatedAt,
     };
-    await tx.update(personalTasks).set({ title, status, completedAt, updatedAt: now })
-      .where(and(eq(personalTasks.id, taskId), eq(personalTasks.userId, userId)));
-
-    if (current.status !== status) {
-      await appendEvent(tx, {
-        userId,
-        type: status === "done" ? "personal_task.completed" : "personal_task.reopened",
-        payload: { taskId },
-      });
-    } else if (current.title !== title) {
-      await appendEvent(tx, { userId, type: "personal_task.updated", payload: { taskId } });
+    if (changed) {
+      await tx.update(personalTasks).set({ title, status, completedAt, updatedAt: now })
+        .where(and(eq(personalTasks.id, taskId), eq(personalTasks.userId, userId)));
     }
+
+    await appendEvent(tx, {
+      userId,
+      type,
+      payload: { taskId, request, changed },
+      clientRequestId,
+    });
     return updated;
   });
 }

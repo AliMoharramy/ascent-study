@@ -41,12 +41,29 @@ describe("PostgreSQL personal tasks", () => {
     });
 
     expect(await listPersonalTasks(fixture.db, otherUserId)).toEqual([]);
-    await expect(updatePersonalTask(fixture.db, otherUserId, task.id, { status: "done" }))
+    await expect(updatePersonalTask(fixture.db, otherUserId, task.id, {
+      status: "done",
+      clientRequestId: "other-owner-completion",
+    }))
       .rejects.toThrow("Unknown personal task");
 
-    const completed = await updatePersonalTask(fixture.db, userId, task.id, { status: "done" });
+    const completionRequest = {
+      status: "done",
+      clientRequestId: "task-completion",
+    };
+    const completed = await updatePersonalTask(fixture.db, userId, task.id, completionRequest);
     expect(completed).toMatchObject({ status: "done", completedAt: expect.any(String) });
-    const reopened = await updatePersonalTask(fixture.db, userId, task.id, { status: "open" });
+    expect(await updatePersonalTask(fixture.db, userId, task.id, completionRequest))
+      .toMatchObject({ id: task.id, status: "done", completedAt: completed.completedAt });
+    await expect(updatePersonalTask(fixture.db, userId, task.id, {
+      ...completionRequest,
+      title: "A different task",
+    })).rejects.toBeInstanceOf(EventRequestConflict);
+
+    const reopened = await updatePersonalTask(fixture.db, userId, task.id, {
+      status: "open",
+      clientRequestId: "task-reopen",
+    });
     expect(reopened).toMatchObject({ status: "open", completedAt: null });
     expect(await listEvents(fixture.db, userId, "personal_task.completed")).toHaveLength(1);
     expect(await listEvents(fixture.db, userId, "personal_task.reopened")).toHaveLength(1);
