@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10151d">
+  <title>Ascent Focus — Windows widget concept</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-synthesis: none;
+      --ink: #f3f6ff;
+      --muted: #9ca8ba;
+      --line: rgba(226, 236, 255, .105);
+      --mint: #8ce7cd;
+      --mint-ink: #142821;
+      --surface: rgba(20, 27, 38, .77);
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-width: 320px;
+      min-height: 100svh;
+      margin: 0;
+      overflow: hidden;
+      color: var(--ink);
+      background: #10151d;
+    }
+    button { color: inherit; font: inherit; }
+    :focus-visible { outline: 2px solid #a5ebd4; outline-offset: 3px; }
+    .desktop {
+      position: relative;
+      display: grid;
+      grid-template-rows: 54px 1fr 38px;
+      width: 100vw;
+      height: 100svh;
+      overflow: hidden;
+      isolation: isolate;
+      background:
+        radial-gradient(ellipse at 76% 18%, rgba(74, 137, 151, .2), transparent 34%),
+        radial-gradient(ellipse at 24% 82%, rgba(108, 88, 145, .18), transparent 38%),
+        linear-gradient(142deg, #121820 0%, #1a202a 46%, #121720 100%);
+    }
+    .desktop::before, .desktop::after {
+      position: absolute;
+      z-index: -1;
+      content: "";
+      border-radius: 50%;
+      filter: blur(1px);
+      pointer-events: none;
+    }
+    .desktop::before {
+      width: 620px; height: 620px; right: -170px; top: 80px;
+      background: radial-gradient(circle at 34% 34%, rgba(113, 194, 190, .25), rgba(56, 99, 124, .09) 39%, transparent 70%);
+    }
+    .desktop::after {
+      width: 540px; height: 540px; left: -180px; bottom: -200px;
+      background: radial-gradient(circle at 60% 35%, rgba(140, 114, 181, .2), transparent 67%);
+    }
+    .topbar, .bottombar {
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 34px;
+      color: rgba(230, 237, 248, .68);
+      font-size: 11px;
+      letter-spacing: .04em;
+    }
+    .topbar { border-bottom: 1px solid rgba(255,255,255,.055); }
+    .brand { display: flex; align-items: center; gap: 10px; color: #e8edf5; font-size: 12px; font-weight: 650; letter-spacing: .12em; }
+    .brand-mark {
+      display: grid; width: 25px; height: 25px; place-items: center;
+      border: 1px solid rgba(173, 247, 222, .28); border-radius: 9px;
+      background: linear-gradient(145deg, rgba(128, 224, 194, .25), rgba(108, 160, 176, .08));
+      color: #b6f3df; font-size: 13px; box-shadow: 0 0 22px rgba(124, 226, 202, .1);
+    }
+    .top-right { display: flex; align-items: center; gap: 9px; }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #83e4c6; box-shadow: 0 0 10px rgba(131,228,198,.7); }
+    .stage { position: relative; min-height: 0; }
+    .hint {
+      position: absolute; left: clamp(28px, 8vw, 128px); top: 38%; max-width: 370px;
+      animation: fade-up .8s .08s both cubic-bezier(.2,.7,.2,1);
+    }
+    .eyebrow { color: #9eaeaf; font-size: 10px; font-weight: 650; letter-spacing: .19em; text-transform: uppercase; }
+    .hint h1 { max-width: 340px; margin: 17px 0 12px; font-size: clamp(34px, 4.2vw, 55px); font-weight: 510; letter-spacing: -.055em; line-height: 1.02; }
+    .hint p { max-width: 320px; margin: 0; color: #9ba7b5; font-size: 13px; line-height: 1.7; }
+    .hint-line { display: flex; align-items: center; gap: 11px; margin-top: 29px; color: #aab8c0; font-size: 11px; }
+    .hint-line::before { width: 26px; height: 1px; content: ""; background: #8ce7cd; opacity: .7; }
+    .widget-wrap { position: absolute; top: 50%; right: clamp(28px, 11vw, 170px); transform: translateY(-47%); }
+    .widget {
+      position: relative;
+      width: min(348px, calc(100vw - 36px));
+      height: auto;
+      min-height: 0;
+      overflow: hidden;
+      border: 1px solid rgba(225, 239, 255, .15);
+      border-radius: 27px;
+      background: linear-gradient(145deg, rgba(30, 39, 52, .84), rgba(17, 23, 33, .79));
+      box-shadow: 0 28px 90px rgba(0,0,0,.42), 0 3px 13px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.09);
+      -webkit-backdrop-filter: blur(34px) saturate(145%);
+      backdrop-filter: blur(34px) saturate(145%);
+      animation: widget-in .58s cubic-bezier(.18,.82,.26,1) both;
+      transform-origin: 90% 50%;
+    }
+    .widget.tasks-open { height: min(650px, calc(100svh - 125px)); min-height: min(525px, calc(100svh - 125px)); }
+    .widget::before { position: absolute; z-index: 0; inset: 0; content: ""; pointer-events: none; background: linear-gradient(118deg, rgba(255,255,255,.045), transparent 35%, transparent 75%, rgba(157,222,220,.035)); }
+    .widget-content { position: relative; z-index: 1; display: flex; height: auto; flex-direction: column; }
+    .widget.tasks-open .widget-content { height: 100%; }
+    .widget-head { display: flex; align-items: center; justify-content: space-between; padding: 20px 21px 16px; }
+    .widget-brand { display: flex; align-items: center; gap: 10px; }
+    .logo {
+      display: grid; width: 32px; height: 32px; place-items: center; flex: 0 0 auto;
+      border: 1px solid rgba(150, 238, 213, .35); border-radius: 11px;
+      background: linear-gradient(145deg, rgba(129, 225, 194, .31), rgba(76, 137, 146, .12)); color: #b6f3df;
+      box-shadow: 0 0 22px rgba(128, 224, 194, .1); font-size: 17px;
+    }
+    .brand-name { font-size: 12px; font-weight: 690; letter-spacing: .13em; }
+    .sync-state { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: #8f9bab; font-size: 9px; letter-spacing: .03em; }
+    .sync-state .live-dot { width: 5px; height: 5px; }
+    .icon-button { display: grid; width: 29px; height: 29px; place-items: center; border: 1px solid transparent; border-radius: 9px; background: transparent; color: #9ba7b6; cursor: pointer; transition: background .18s, color .18s, transform .18s; }
+    .icon-button:hover { transform: rotate(4deg); border-color: rgba(255,255,255,.08); background: rgba(255,255,255,.06); color: white; }
+    .tabs { display: flex; gap: 5px; margin: 0 20px 14px; padding: 4px; border: 1px solid rgba(255,255,255,.075); border-radius: 12px; background: rgba(5, 9, 15, .22); }
+    .tab { flex: 1; min-width: 0; padding: 8px 5px; border: 0; border-radius: 8px; background: transparent; color: #8995a6; cursor: pointer; font-size: 10px; font-weight: 570; transition: background .2s, color .2s, box-shadow .2s; }
+    .tab:hover { color: #e8eff5; }
+    .tab[aria-selected="true"] { background: rgba(196, 224, 226, .12); color: #e9f3f3; box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
+    .timer-card { position: relative; display: flex; align-items: center; gap: 15px; margin: 0 20px; padding: 15px 15px 13px; overflow: hidden; border: 1px solid rgba(176, 231, 218, .15); border-radius: 17px; background: linear-gradient(120deg, rgba(102, 157, 157, .17), rgba(83, 104, 133, .12) 56%, rgba(99, 92, 133, .15)); }
+    .timer-card::after { position: absolute; width: 125px; height: 125px; right: -44px; top: -76px; content: ""; border-radius: 50%; background: rgba(146, 229, 206, .1); filter: blur(23px); }
+    .timer-ring { position: relative; display: grid; width: 70px; height: 70px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: conic-gradient(#91e6ce 0 69%, rgba(227,241,243,.12) 69% 100%); transition: background .5s linear; }
+    .timer-ring::before { position: absolute; inset: 4px; content: ""; border: 1px solid rgba(225,244,240,.08); border-radius: 50%; background: rgba(24, 35, 43, .93); }
+    .timer-symbol { position: relative; color: #bbf2df; font-size: 18px; }
+    .timer-copy { position: relative; z-index: 1; min-width: 0; flex: 1; }
+    .timer-label { margin-bottom: 6px; color: #a4c7c1; font-size: 9px; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; }
+    .timer-value { font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 520; letter-spacing: -.045em; line-height: 1; }
+    .timer-task { max-width: 194px; overflow: hidden; margin-top: 6px; color: #a1adbb; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+    .timer-actions { display: flex; gap: 7px; margin-top: 12px; }
+    .primary-button, .quiet-button, .tiny-button { border: 0; cursor: pointer; transition: transform .16s, background .16s, border-color .16s, opacity .16s; }
+    .primary-button:active, .quiet-button:active, .tiny-button:active { transform: scale(.97); }
+    .primary-button { min-width: 82px; padding: 7px 12px; border-radius: 8px; background: #a5ebd4; color: #18302a; font-size: 10px; font-weight: 720; box-shadow: 0 3px 12px rgba(129,226,199,.13); }
+    .primary-button:hover { background: #c3f6e7; }
+    .quiet-button { padding: 7px 10px; border: 1px solid rgba(228,237,250,.1); border-radius: 8px; background: rgba(255,255,255,.045); color: #c3ccd7; font-size: 10px; }
+    .quiet-button:hover { border-color: rgba(228,237,250,.2); background: rgba(255,255,255,.09); }
+    .task-trigger {
+      display: flex; width: calc(100% - 40px); min-height: 46px; align-items: center; justify-content: space-between;
+      margin: 11px 20px 18px; padding: 8px 12px; border: 1px solid rgba(226,236,255,.11); border-radius: 12px;
+      background: rgba(255,255,255,.045); color: #dce6ec; cursor: pointer; text-align: left;
+      transition: border-color .2s, background .2s, transform .2s;
+    }
+    .task-trigger:hover { transform: translateY(-1px); border-color: rgba(140,231,205,.24); background: rgba(140,231,205,.07); }
+    .task-trigger-copy { display: flex; align-items: center; gap: 10px; }
+    .task-trigger-icon { display: grid; width: 27px; height: 27px; place-items: center; border: 1px solid rgba(140,231,205,.13); border-radius: 8px; background: rgba(140,231,205,.08); color: #a5ebd4; }
+    .task-trigger-label { display: block; font-size: 10px; font-weight: 620; }
+    .task-trigger-meta { display: block; margin-top: 3px; color: #94a2af; font-size: 9px; }
+    .task-chevron { color: #a4b0bc; transition: transform .28s cubic-bezier(.2,.8,.2,1); }
+    .task-trigger[aria-expanded="true"] .task-chevron { transform: rotate(180deg); }
+    .task-panel { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow: hidden; opacity: 0; transform: translateY(-8px); transition: opacity .23s ease, transform .34s cubic-bezier(.2,.8,.2,1); }
+    .task-panel[hidden] { display: none; }
+    .task-panel.is-open { opacity: 1; transform: translateY(0); }
+    .section-head { display: flex; align-items: center; justify-content: space-between; margin: 13px 21px 9px; }
+    .section-title { color: #e5eaf1; font-size: 11px; font-weight: 640; letter-spacing: .015em; }
+    .section-meta { color: #8390a0; font-size: 9px; }
+    .ai-card { margin: 0 20px 4px; padding: 12px 12px 11px; border: 1px solid rgba(180, 162, 233, .16); border-radius: 14px; background: linear-gradient(114deg, rgba(135, 115, 173, .14), rgba(112, 123, 158, .08) 63%, rgba(89, 151, 152, .09)); transition: border-color .25s, background .25s; }
+    .ai-top { display: flex; align-items: center; justify-content: space-between; }
+    .ai-kicker { display: flex; align-items: center; gap: 6px; color: #c8b9ef; font-size: 9px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+    .ai-spark { color: #d6c9ff; font-size: 13px; }
+    .ai-time { color: #9c9aaf; font-size: 9px; }
+    .ai-title { margin: 7px 0 9px; color: #e5e3ee; font-size: 11px; font-weight: 550; }
+    .ai-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .privacy-toggle { display: inline-flex; align-items: center; gap: 6px; color: #9297aa; cursor: pointer; font-size: 8px; }
+    .privacy-toggle input { width: 12px; height: 12px; margin: 0; accent-color: #aa94df; }
+    .tiny-button { padding: 6px 9px; border: 1px solid rgba(206,193,244,.17); border-radius: 7px; background: rgba(180,165,224,.1); color: #d9d0f0; font-size: 9px; font-weight: 620; white-space: nowrap; }
+    .tiny-button:hover { background: rgba(180,165,224,.18); }
+    .task-list { min-height: 0; flex: 1; overflow-y: auto; padding: 0 20px 12px; scrollbar-width: thin; scrollbar-color: rgba(205,219,232,.17) transparent; }
+    .task-row { display: flex; align-items: center; gap: 9px; padding: 10px 0; border-bottom: 1px solid rgba(227,237,249,.065); animation: row-in .3s both; }
+    .task-row:last-child { border-bottom: 0; }
+    .task-icon { display: grid; width: 28px; height: 28px; flex: 0 0 auto; place-items: center; border: 1px solid rgba(255,255,255,.07); border-radius: 9px; background: rgba(228,237,255,.045); color: #a9c9cf; font-size: 11px; }
+    .task-copy { min-width: 0; flex: 1; }
+    .task-name { overflow: hidden; color: #dfe5ed; font-size: 10px; font-weight: 540; text-overflow: ellipsis; white-space: nowrap; transition: color .2s; }
+    .task-detail { overflow: hidden; margin-top: 4px; color: #8692a2; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+    .task-actions { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; }
+    .task-work, .task-done { min-width: 39px; padding: 5px 7px; border: 1px solid rgba(216,228,243,.1); border-radius: 7px; background: rgba(255,255,255,.035); color: #bcc8d2; cursor: pointer; font-size: 8px; transition: all .17s; }
+    .task-work:hover { border-color: rgba(140,231,205,.28); background: rgba(140,231,205,.1); color: #b8f3df; }
+    .task-done { min-width: 24px; color: #8794a4; }
+    .task-done:hover { border-color: rgba(140,231,205,.26); background: rgba(140,231,205,.09); color: #9be7cf; }
+    .task-row.completed .task-name { color: #8b9d9b; text-decoration: line-through; text-decoration-color: #6a9b8a; }
+    .task-row.completed .task-icon { color: #8ce7cd; }
+    .empty-note { padding: 23px 4px; color: #929dad; font-size: 10px; line-height: 1.6; text-align: center; }
+    .bottom-note { display: flex; justify-content: center; padding: 10px; border-top: 1px solid rgba(255,255,255,.055); color: #6f7d8d; font-size: 8px; letter-spacing: .035em; }
+    .collapsed {
+      display: none; min-width: 101px; height: 44px; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 5px 7px 5px 13px; border: 1px solid rgba(205,243,232,.24); border-radius: 14px;
+      background: rgba(24, 34, 43, .84); color: #e8f1f1; cursor: pointer;
+      box-shadow: 0 13px 35px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.08);
+      -webkit-backdrop-filter: blur(22px) saturate(145%); backdrop-filter: blur(22px) saturate(145%);
+      transition: transform .2s, border-color .2s, background .2s;
+    }
+    .collapsed:hover { transform: translateY(-2px); border-color: rgba(140,231,205,.48); background: rgba(31, 45, 53, .94); }
+    .collapsed-time { min-width: 42px; color: #eaf5f1; font-size: 12px; font-weight: 720; font-variant-numeric: tabular-nums; letter-spacing: .04em; text-align: center; }
+    .collapsed-logo { display: grid; width: 29px; height: 29px; flex: 0 0 auto; place-items: center; border: 1px solid rgba(173,247,222,.3); border-radius: 50%; background: linear-gradient(145deg, rgba(128,224,194,.34), rgba(108,160,176,.16)); color: #b6f3df; font-size: 15px; }
+    .widget-wrap.is-closed .widget { display: none; }
+    .widget-wrap.is-closed .collapsed { display: flex; animation: widget-in .34s cubic-bezier(.18,.82,.26,1) both; }
+    .toast { position: fixed; z-index: 4; left: 50%; bottom: 56px; padding: 10px 14px; transform: translate(-50%, 12px); border: 1px solid rgba(220,238,239,.17); border-radius: 12px; background: rgba(28, 38, 49, .9); color: #d8eee7; opacity: 0; pointer-events: none; font-size: 10px; box-shadow: 0 10px 35px rgba(0,0,0,.25); transition: opacity .2s, transform .2s; -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+    .toast.visible { transform: translate(-50%, 0); opacity: 1; }
+    .bottombar { justify-content: center; border-top: 1px solid rgba(255,255,255,.045); color: rgba(207,218,231,.46); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+    @keyframes widget-in { from { opacity: 0; transform: translateY(10px) scale(.97); filter: blur(5px); } to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } }
+    @keyframes fade-up { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes row-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    @media (max-width: 860px) {
+      .hint { left: 30px; top: auto; bottom: 24px; max-width: 250px; }
+      .hint h1 { margin: 8px 0; font-size: 24px; }
+      .hint p { font-size: 10px; }
+      .hint-line { display: none; }
+      .widget-wrap { right: 7vw; }
+    }
+    @media (max-width: 620px) {
+      .desktop { grid-template-rows: 46px 1fr 24px; }
+      .topbar { padding: 0 17px; }
+      .top-right { font-size: 9px; }
+      .hint { display: none; }
+      .widget-wrap { right: 50%; transform: translate(50%, -49%); }
+      .widget.tasks-open { height: min(650px, calc(100svh - 94px)); min-height: min(500px, calc(100svh - 94px)); }
+      .bottombar { font-size: 8px; }
+    }
+    @media (max-height: 680px) and (min-width: 621px) {
+      .widget.tasks-open { min-height: 0; height: calc(100svh - 94px); }
+      .widget-head { padding-top: 12px; padding-bottom: 10px; }
+      .tabs { margin-bottom: 9px; }
+      .timer-card { padding: 10px 13px; }
+      .timer-ring { width: 58px; height: 58px; }
+      .section-head { margin-top: 12px; }
+      .ai-card { padding: 9px 11px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="desktop" aria-label="Desktop widget concept preview">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">△</span> ASCENT</div>
+      <div class="top-right"><span class="live-dot" aria-hidden="true"></span> WINDOWS DESKTOP CONCEPT</div>
+    </header>
+    <section class="stage">
+      <div class="hint">
+        <div class="eyebrow">Focus, just a glance away</div>
+        <h1>Your next step,<br>always in view.</h1>
+        <p>A compact timer at a glance. Open it to focus, then expand your tasks when you need a plan.</p>
+        <div class="hint-line">A native Rust + Slint direction</div>
+      </div>
+      <div class="widget-wrap is-closed" id="widgetWrap">
+        <section class="widget" aria-label="Ascent focus widget">
+          <div class="widget-content">
+            <header class="widget-head">
+              <div class="widget-brand">
+                <div class="logo" aria-hidden="true">△</div>
+                <div><div class="brand-name">ASCENT</div><div class="sync-state"><span class="live-dot"></span> Synced to your account</div></div>
+              </div>
+              <button class="icon-button" id="closeWidget" aria-label="Minimize widget" title="Minimize">−</button>
+            </header>
+            <section class="timer-card" aria-label="Focus timer">
+              <div class="timer-ring" id="timerRing"><span class="timer-symbol">◷</span></div>
+              <div class="timer-copy">
+                <div class="timer-label" id="timerLabel">Ready when you are</div>
+                <div class="timer-value" id="timerValue">25:00</div>
+                <div class="timer-task" id="timerTask">Choose a task to focus on</div>
+                <div class="timer-actions">
+                  <button class="primary-button" id="timerToggle">Start focus</button>
+                  <button class="quiet-button" id="timerFinish">Finish</button>
+                </div>
+              </div>
+            </section>
+            <button class="task-trigger" id="taskToggle" aria-expanded="false" aria-controls="taskPanel">
+              <span class="task-trigger-copy">
+                <span class="task-trigger-icon" aria-hidden="true">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M5.2 4.1h7M5.2 8h7m-7 3.9h7M2.4 4.1h.1M2.4 8h.1m-.1 3.9h.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                </span>
+                <span><span class="task-trigger-label" id="taskToggleLabel">Open task list</span><span class="task-trigger-meta" id="taskToggleMeta">Today · 4 items</span></span>
+              </span>
+              <svg class="task-chevron" width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m4 6 4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <section class="task-panel" id="taskPanel" hidden>
+              <nav class="tabs" role="tablist" aria-label="Task source">
+                <button class="tab" role="tab" aria-selected="true" data-tab="today">Today</button>
+                <button class="tab" role="tab" aria-selected="false" data-tab="courses">Courses</button>
+                <button class="tab" role="tab" aria-selected="false" data-tab="mine">Mine</button>
+              </nav>
+              <div class="section-head">
+                <div class="section-title" id="listTitle">Today’s tasks</div>
+                <div class="section-meta" id="listMeta">2 of 4 done</div>
+              </div>
+              <section class="ai-card" id="aiCard" aria-label="AI task suggestion">
+                <div class="ai-top"><div class="ai-kicker"><span class="ai-spark">✳</span> AI suggested next step</div><div class="ai-time">~20 min</div></div>
+                <div class="ai-title">Review eigenvectors from yesterday</div>
+                <div class="ai-bottom">
+                  <label class="privacy-toggle"><input id="shareTitles" type="checkbox"> Share task titles for tailored ideas</label>
+                  <button class="tiny-button" id="addSuggestion">Add to Mine</button>
+                </div>
+              </section>
+              <div class="task-list" id="taskList" role="tabpanel" aria-live="polite"></div>
+            </section>
+            <footer class="bottom-note">Your website account stays the source of truth</footer>
+          </div>
+        </section>
+        <button class="collapsed" id="openWidget" aria-label="Open Ascent focus timer" title="Open Ascent timer">
+          <span class="collapsed-time" id="compactTimer">25:00</span>
+          <span class="collapsed-logo" aria-hidden="true">△</span>
+        </button>
+      </div>
+    </section>
+    <footer class="bottombar">Floating timer · Today’s work · Your way</footer>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </main>
+  <script>
+    const tasks = {
+      today: [
+        { id: "quest-focus", icon: "◷", name: "Focus for 45 minutes", detail: "Daily quest · 25 / 45 min", done: false, work: true },
+        { id: "quest-lesson", icon: "▱", name: "Complete a lesson", detail: "Daily quest · Study progress", done: false, work: true },
+        { id: "quest-review", icon: "✳", name: "Review 12 flashcards", detail: "Daily quest · 8 / 12 cards", done: true, work: true },
+        { id: "quest-streak", icon: "↗", name: "Keep your study streak", detail: "Daily quest · 1 session today", done: true, work: true }
+      ],
+      courses: [
+        { id: "course-linear-8", icon: "∑", name: "Eigenvalues & eigenvectors", detail: "Linear Algebra · Lesson 08", done: false, work: true },
+        { id: "course-physics-4", icon: "◉", name: "Electric field basics", detail: "Physics II · Lesson 04", done: false, work: true },
+        { id: "course-stats-6", icon: "⌁", name: "Confidence intervals", detail: "Statistics · Lesson 06", done: false, work: true }
+      ],
+      mine: [
+        { id: "mine-chapter", icon: "▤", name: "Read chapter 4 notes", detail: "Personal task · 20 min", done: false, work: true },
+        { id: "mine-outline", icon: "✎", name: "Draft project outline", detail: "Personal task · No estimate", done: false, work: true }
+      ]
+    };
+    const tabNames = { today: "Today’s tasks", courses: "Course lessons", mine: "My tasks" };
+    let activeTab = "today";
+    let currentTask = "";
+    let remaining = 25 * 60;
+    let running = false;
+    let timerHandle = null;
+    let toastHandle = null;
+    let panelFrame = null;
+    let panelHideHandle = null;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const widgetWrap = document.getElementById("widgetWrap");
+    const list = document.getElementById("taskList");
+    const toggle = document.getElementById("timerToggle");
+    const value = document.getElementById("timerValue");
+    const ring = document.getElementById("timerRing");
+    const taskPanel = document.getElementById("taskPanel");
+    const taskPanelToggle = document.getElementById("taskToggle");
+    const compactTimer = document.getElementById("compactTimer");
+
+    function setTaskPanel(open) {
+      clearTimeout(panelHideHandle);
+      if (panelFrame !== null) cancelAnimationFrame(panelFrame);
+      taskPanelToggle.setAttribute("aria-expanded", String(open));
+      document.getElementById("taskToggleLabel").textContent = open ? "Hide task list" : "Open task list";
+      if (open) {
+        taskPanel.hidden = false;
+        panelFrame = requestAnimationFrame(() => {
+          if (taskPanelToggle.getAttribute("aria-expanded") === "true") taskPanel.classList.add("is-open");
+          panelFrame = null;
+        });
+      } else {
+        taskPanel.classList.remove("is-open");
+        panelHideHandle = setTimeout(() => {
+          if (taskPanelToggle.getAttribute("aria-expanded") === "false") taskPanel.hidden = true;
+        }, reducedMotion ? 0 : 240);
+      }
+    }
+
+    function toast(message) {
+      const el = document.getElementById("toast");
+      el.textContent = message;
+      el.classList.add("visible");
+      clearTimeout(toastHandle);
+      toastHandle = setTimeout(() => el.classList.remove("visible"), 2200);
+    }
+    function renderTasks() {
+      const rows = tasks[activeTab];
+      document.querySelectorAll(".tab").forEach(btn => btn.setAttribute("aria-selected", String(btn.dataset.tab === activeTab)));
+      document.getElementById("listTitle").textContent = tabNames[activeTab];
+      const done = rows.filter(t => t.done).length;
+      document.getElementById("listMeta").textContent = activeTab === "today" ? `${done} of ${rows.length} done` : `${rows.length} items`;
+      document.getElementById("taskToggleMeta").textContent = activeTab === "today" ? `Today · ${rows.length - done} active` : `${activeTab === "courses" ? "Courses" : "Mine"} · ${rows.length} items`;
+      document.getElementById("aiCard").style.display = activeTab === "today" ? "block" : "none";
+      if (!rows.length) { list.innerHTML = '<div class="empty-note">Nothing here yet. Your synced tasks will appear here.</div>'; return; }
+      list.innerHTML = rows.map((task, index) => `
+        <article class="task-row ${task.done ? "completed" : ""}" style="animation-delay:${index * 35}ms" data-id="${task.id}">
+          <div class="task-icon" aria-hidden="true">${task.done ? "✓" : task.icon}</div>
+          <div class="task-copy"><div class="task-name">${task.name}</div><div class="task-detail">${task.detail}</div></div>
+          <div class="task-actions"><button class="task-work" data-action="work" ${task.done ? "disabled" : ""}>Work</button><button class="task-done" data-action="done" aria-label="Mark ${task.name} done" title="Mark done" ${task.done ? "disabled" : ""}>✓</button></div>
+        </article>`).join("");
+    }
+    function paintTimer() {
+      const mins = Math.floor(remaining / 60).toString().padStart(2, "0");
+      const secs = (remaining % 60).toString().padStart(2, "0");
+      const timeText = `${mins}:${secs}`;
+      value.textContent = timeText;
+      compactTimer.textContent = timeText;
+      document.getElementById("timerLabel").textContent = running ? "Focus session in progress" : (currentTask ? "Paused · ready to resume" : "Ready when you are");
+      document.getElementById("timerTask").textContent = currentTask || "Choose a task to focus on";
+      toggle.textContent = running ? "Pause" : (currentTask ? "Resume" : "Start focus");
+      ring.style.background = `conic-gradient(#91e6ce 0 ${Math.max(0, Math.min(100, (1 - remaining / 1500) * 100))}%, rgba(227,241,243,.12) 0 100%)`;
+    }
+    function ensureTimerTicker() {
+      if (timerHandle) return;
+      timerHandle = setInterval(() => {
+        if (!running) return;
+        remaining = Math.max(0, remaining - 1);
+        if (remaining === 0) {
+          running = false;
+          clearInterval(timerHandle);
+          timerHandle = null;
+          toast("Focus session complete");
+        }
+        paintTimer();
+      }, 1000);
+    }
+    function startFocus(taskName = "") {
+      if (taskName) currentTask = taskName;
+      if (remaining === 0) remaining = 25 * 60;
+      running = true;
+      ensureTimerTicker();
+      paintTimer();
+    }
+    function startTask(task) {
+      startFocus(task.name);
+      toast(`Focus started · ${task.name}`);
+    }
+    document.querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", () => { activeTab = btn.dataset.tab; renderTasks(); }));
+    list.addEventListener("click", event => {
+      const button = event.target.closest("button[data-action]");
+      if (!button) return;
+      const row = button.closest(".task-row");
+      const task = tasks[activeTab].find(item => item.id === row.dataset.id);
+      if (!task) return;
+      if (button.dataset.action === "work") startTask(task);
+      if (button.dataset.action === "done") {
+        task.done = true;
+        renderTasks();
+        toast("Marked complete in this preview");
+      }
+    });
+    taskPanelToggle.addEventListener("click", () => setTaskPanel(taskPanelToggle.getAttribute("aria-expanded") !== "true"));
+    toggle.addEventListener("click", () => {
+      if (running) {
+        running = false;
+        paintTimer();
+        toast("Focus paused");
+      } else {
+        startFocus();
+        toast(currentTask ? "Focus resumed" : "Focus session started");
+      }
+    });
+    document.getElementById("timerFinish").addEventListener("click", () => {
+      running = false;
+      clearInterval(timerHandle);
+      timerHandle = null;
+      remaining = 25 * 60;
+      currentTask = "";
+      paintTimer();
+      toast("Session finished in this preview");
+    });
+    document.getElementById("shareTitles").addEventListener("change", event => {
+      toast(event.target.checked ? "Opt-in enabled for this preview" : "Task titles stay private");
+    });
+    document.getElementById("addSuggestion").addEventListener("click", () => {
+      const suggestion = { id: `mine-ai-${Date.now()}`, icon: "✳", name: "Review eigenvectors from yesterday", detail: "AI suggestion · Added by you", done: false, work: true };
+      tasks.mine.unshift(suggestion);
+      activeTab = "mine";
+      renderTasks();
+      toast("Suggestion added to Mine");
+    });
+    document.getElementById("closeWidget").addEventListener("click", () => {
+      setTaskPanel(false);
+      widgetWrap.classList.add("is-closed");
+      document.getElementById("openWidget").focus();
+    });
+    document.getElementById("openWidget").addEventListener("click", () => {
+      setTaskPanel(false);
+      widgetWrap.classList.remove("is-closed");
+      document.getElementById("closeWidget").focus();
+    });
+    renderTasks();
+    paintTimer();
+  </script>
+</body>
+</html>

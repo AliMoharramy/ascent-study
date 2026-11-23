@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, type TestDb } from "@/db/testing";
 import { focusSessions } from "@/db/schema";
 import { createUser } from "./auth";
-import { FocusConflict, idlePause, manualFocus, minutesForDay, openSession, resumeFocus, startFocus, stopFocus } from "./focus";
+import { FocusConflict, idlePause, manualFocus, minutesForDay, openSession, pauseFocus, resumeFocus, startFocus, stopFocus } from "./focus";
 import { listEvents } from "@/events/store";
 
 let fixture: TestDb;
@@ -34,6 +34,21 @@ describe("PostgreSQL focus transactions", () => {
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     const failed = results.find((r) => r.status === "rejected");
     expect(failed?.status === "rejected" && failed.reason).toBeInstanceOf(FocusConflict);
+  });
+
+  it("persists the selected task title across focus transitions", async () => {
+    const started = await startFocus(fixture.db, userId, {
+      kind: "video",
+      taskTitle: "Review chapter 4",
+    }, { now });
+    expect(started.taskTitle).toBe("Review chapter 4");
+
+    await pauseFocus(fixture.db, userId, new Date("2026-11-14T00:39:00Z"));
+    expect(await openSession(fixture.db, userId)).toMatchObject({
+      id: started.id,
+      taskTitle: "Review chapter 4",
+      status: "paused",
+    });
   });
 
   it("increments idle pauses once per running-to-paused transition", async () => {

@@ -36,7 +36,8 @@ describe("migration safety", () => {
       await expect(migratePgUp(client, { migrations: [...loadPgMigrations(), migration("CREATE TABLE partial (id int); SELECT 1/0;")] }))
         .rejects.toThrow(/rolled back/);
       expect((await client.query("SELECT to_regclass('partial') AS table")).rows[0].table).toBeNull();
-      expect((await client.query("SELECT version FROM _migrations")).rows).toEqual([{ version: "0001_baseline" }]);
+      expect((await client.query("SELECT version FROM _migrations ORDER BY version")).rows)
+        .toEqual(loadPgMigrations().map(({ version }) => ({ version })));
     } finally { await client.end(); }
   });
 

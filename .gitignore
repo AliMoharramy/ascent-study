@@ -1,4 +1,6 @@
 node_modules/
+target/
+dist/
 .next/
 .next-win/
 .env

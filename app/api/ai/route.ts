@@ -3,6 +3,7 @@ import { ApiError, api, body } from "@/server/http";
 import { aiCallLog, aiStatus, anomalyAlerts, errorAnalysis, narrative, weeklyReview } from "@/server/ai";
 import { takeToken } from "@/server/ratelimit";
 import { gameDay } from "@/lib/time";
+import { taskSuggestion } from "@/server/taskSuggestions";
 
 export const maxDuration = 60;
 
@@ -17,6 +18,7 @@ const input = z.discriminatedUnion("action", [
   z.object({ action: z.literal("weekly"), refresh: z.boolean().default(false) }),
   z.object({ action: z.literal("errors") }),
   z.object({ action: z.literal("narrative") }),
+  z.object({ action: z.literal("suggest_tasks") }),
 ]);
 
 export const POST = api(async ({ db, userId, req, session }) => {
@@ -27,5 +29,6 @@ export const POST = api(async ({ db, userId, req, session }) => {
   const d = day(session);
   if (b.action === "weekly") return { weekly: await weeklyReview(db, userId, d, b.refresh), status: (await aiStatus(db, userId, d)) };
   if (b.action === "errors") return { analysis: await errorAnalysis(db, userId, d) };
-  return { narrative: await narrative(db, userId, d) };
+  if (b.action === "narrative") return { narrative: await narrative(db, userId, d) };
+  return { suggestion: await taskSuggestion(db, userId, d, session.user.shareTaskTitlesWithAi) };
 });
