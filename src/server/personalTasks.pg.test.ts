@@ -34,11 +34,7 @@ describe("PostgreSQL personal tasks", () => {
       title: "Review chapter 4",
       clientRequestId: "owned-task-create",
     });
-    const otherUserId = await createUser(fixture.db, {
-      username: "anotherowner",
-      name: "Another owner",
-      password: "local test password",
-    });
+    const otherUserId = `${userId}-other`;
 
     expect(await listPersonalTasks(fixture.db, otherUserId)).toEqual([]);
     await expect(updatePersonalTask(fixture.db, otherUserId, task.id, {
