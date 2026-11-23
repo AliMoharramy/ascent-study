@@ -52,7 +52,18 @@ iscc packaging\windows.iss
 
 The setup file is written to `dist\windows\AscentFocus-Setup.exe`. If `iscc` is not on `PATH`, run the `ISCC.exe` installed with Inno Setup and pass it `packaging\windows.iss`.
 
-The first build may take a few minutes. The app uses Slint's Winit backend and software renderer rather than Chromium/WebView. Windows 11 receives a transient system backdrop when supported; the near-opaque UI remains the fallback on other systems. The installer is currently unsigned, so Windows may show its normal unknown-publisher prompt. RAM/CPU targets are not claimed until the packaged Windows app has been measured.
+The first build may take a few minutes. The app uses Slint's Winit backend and software renderer rather than Chromium/WebView. Windows 11 receives a transient system backdrop when supported; the near-opaque UI remains the fallback on other systems. The installer is currently unsigned, so Windows may show its normal unknown-publisher prompt.
+
+### Initial Windows resource readings
+
+Owner-reported readings from the `make start` debug build on 2026-11-23:
+
+| State | CPU | RAM |
+|---|---:|---:|
+| Before starting the timer (idle) | 0% | 5.4 MB |
+| Timer running with all widget panels open | 1.5% | 7.2 MB |
+
+These are point-in-time readings; hardware details and sampling duration were not recorded. They are useful as an initial observation, not a release-build benchmark or a guaranteed resource budget. Measure the packaged release build before setting a supported budget.
 
 ## Development notes
 
@@ -62,4 +73,4 @@ The first build may take a few minutes. The app uses Slint's Winit backend and s
 - The selected task title is stored with its focus session in `focus_sessions.task_title` and returned by `GET /api/focus`. It is display metadata; it does not complete or alter the task. Titles are sent to AI only when the account-level sharing preference is enabled.
 - Windows Credential Manager contains the session token and CSRF token. Plain settings contain the server URL and last widget screen position.
 - `desktop/windows-widget/src` contains the Rust client; `ui` contains the Slint UI and tray menu.
-- The Windows package should be measured and exercised on Windows before setting a memory/CPU budget or publishing it.
+- The debug build has initial owner-reported measurements above; the packaged release build still needs measurement before setting a memory/CPU budget.
