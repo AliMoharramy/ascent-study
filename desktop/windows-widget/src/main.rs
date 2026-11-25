@@ -6,7 +6,7 @@ mod settings;
 
 slint::include_modules!();
 
-use api::{ApiClient, ApiError, FocusSession, TaskSource, WidgetTask};
+use api::{ApiClient, ApiError, FocusActionResult, FocusSession, TaskSource, WidgetTask};
 use credentials::SessionCredential;
 use slint::{ModelRc, VecModel};
 use std::collections::HashMap;
@@ -333,13 +333,19 @@ fn start_focus_action(
         });
         let result = result.and_then(|client| {
             match client.focus_action(&action, task.as_ref(), &fallback_kind) {
-                Ok(session) => Ok((session, None)),
+                Ok(response) => Ok((response, None)),
                 Err(error) => {
                     // A lost response can happen after the server committed the transition.
                     // Read the server state before presenting the action as unsaved.
                     let reconciled = client.focus();
                     match reconciled {
-                        Ok(session) => Ok((session, Some(error))),
+                        Ok(session) => Ok((
+                            FocusActionResult {
+                                session,
+                                ..FocusActionResult::default()
+                            },
+                            Some(error),
+                        )),
                         Err(sync_error) if sync_error.unauthorized => Err(sync_error),
                         Err(_) => Err(error),
                     }
@@ -351,9 +357,12 @@ fn start_focus_action(
                 return;
             };
             match result {
-                Ok((session, warning)) => {
-                    apply_focus(&ui, &state, session);
-                    if refresh_tasks_after {
+                Ok((response, warning)) => {
+                    apply_focus(&ui, &state, response.session);
+                    if response.block_completed {
+                        show_focus_completion(&ui, response.task_auto_completed);
+                    }
+                    if refresh_tasks_after || response.block_completed {
                         ui.set_busy(true);
                         ui.set_message("Refreshing tasks after the focus session…".into());
                         refresh_from_server(ui.as_weak(), state.clone(), true);
@@ -371,6 +380,69 @@ fn start_focus_action(
                                 .into(),
                         );
                     }
+                }
+                Err(error) => auth_error(&ui, &state, &error),
+            }
+        });
+    });
+}
+
+fn show_focus_completion(ui: &FocusWidget, task_completed: bool) {
+    ui.set_completion_text(
+        if task_completed {
+            "25-minute block complete · task completed"
+        } else {
+            "25-minute focus block complete"
+        }
+        .into(),
+    );
+    ui.set_completion_visible(true);
+}
+
+fn complete_focus_block_action(
+    weak: slint::Weak<FocusWidget>,
+    state: SharedState,
+    session_id: String,
+) {
+    let (server_url, credential) = snapshot(&state);
+    thread::spawn(move || {
+        let result = ApiClient::new(&server_url, credential)
+            .map_err(|message| ApiError {
+                message,
+                unauthorized: false,
+            })
+            .and_then(|client| match client.complete_focus_block(&session_id) {
+                Ok(response) => Ok(response),
+                Err(error) => match client.complete_focus_block(&session_id) {
+                    Ok(response) => Ok(response),
+                    Err(sync_error) if sync_error.unauthorized => Err(sync_error),
+                    Err(_) => match client.focus() {
+                        Ok(session) => Ok(FocusActionResult {
+                            session,
+                            ..FocusActionResult::default()
+                        }),
+                        Err(sync_error) if sync_error.unauthorized => Err(sync_error),
+                        Err(_) => Err(error),
+                    },
+                },
+            });
+
+        let _ = slint::invoke_from_event_loop(move || {
+            let Some(ui) = weak.upgrade() else {
+                return;
+            };
+            match result {
+                Ok(response) if response.block_completed => {
+                    apply_focus(&ui, &state, None);
+                    show_focus_completion(&ui, response.task_auto_completed);
+                    ui.set_busy(true);
+                    ui.set_message("Refreshing tasks after the focus session…".into());
+                    refresh_from_server(ui.as_weak(), state.clone(), true);
+                }
+                Ok(response) => {
+                    apply_focus(&ui, &state, response.session);
+                    ui.set_busy(false);
+                    ui.set_message("".into());
                 }
                 Err(error) => auth_error(&ui, &state, &error),
             }
@@ -752,14 +824,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let weak = ui.as_weak();
-    ui.on_tick(move || {
-        let Some(ui) = weak.upgrade() else {
-            return;
-        };
-        let elapsed = ui.get_elapsed_seconds();
-        let next = elapsed.saturating_add(1);
-        ui.set_elapsed_seconds(next);
-        ui.set_timer_text(format_time(next).into());
+    ui.on_tick({
+        let state = state.clone();
+        let weak = weak.clone();
+        move || {
+            let Some(ui) = weak.upgrade() else {
+                return;
+            };
+            let elapsed = ui.get_elapsed_seconds();
+            let next = elapsed.saturating_add(1).min(25 * 60);
+            ui.set_elapsed_seconds(next);
+            ui.set_timer_text(format_time(next).into());
+            if next >= 25 * 60 && ui.get_session_active() && !ui.get_busy() {
+                let session = state.lock().ok().and_then(|shared| shared.focus.clone());
+                if let Some(session) = session {
+                    ui.set_busy(true);
+                    ui.set_message("Completing the 25-minute focus block…".into());
+                    complete_focus_block_action(weak.clone(), state.clone(), session.id);
+                }
+            }
+        }
     });
 
     let weak = ui.as_weak();

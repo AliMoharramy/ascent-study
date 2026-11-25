@@ -8,6 +8,7 @@ import { apiFetch, requestId } from "@/ui/client";
 import { MascotSlot, type HeroMascotState } from "@/ui/Mascot";
 import { Chip, cx, Eyebrow, ProgressBar } from "@/ui/components";
 import { Icon } from "@/ui/icons";
+import { useFocusBlockCompletion, type FocusBlockResult } from "@/ui/useFocusBlockCompletion";
 
 type Subject = { id: string; nameEn: string; nameFa: string };
 
@@ -27,6 +28,9 @@ export function TimerCard({ className, subjects, initial, initialMinutesToday, t
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [blockSuccess, setBlockSuccess] = useState<string | null>(null);
+  const completedBlockIds = useRef(new Set<string>());
+  const successTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const anchor = useRef<{ client: number; elapsed: number } | null>(initial ? { client: Date.now(), elapsed: initial.elapsedMs } : null);
 
   const apply = useCallback((v: FocusView | null) => {
@@ -62,12 +66,27 @@ export function TimerCard({ className, subjects, initial, initialMinutesToday, t
 
   const elapsed = session && anchor.current ? anchor.current.elapsed + (session.status === "running" ? now - anchor.current.client : 0) : 0;
 
+  const showBlockSuccess = useCallback((result: FocusBlockResult) => {
+    const id = result.session?.id;
+    if (id && completedBlockIds.current.has(id)) return;
+    if (id) completedBlockIds.current.add(id);
+    if (typeof result.todayMinutes === "number") setMinutesToday(result.todayMinutes);
+    apply(null);
+    setBlockSuccess(result.taskAutoCompleted ? "25-minute focus block complete · task completed" : "25-minute focus block complete");
+    if (successTimer.current) clearTimeout(successTimer.current);
+    successTimer.current = setTimeout(() => setBlockSuccess(null), 4_500);
+  }, [apply]);
+
+  const syncEndedBlock = useCallback(() => { void syncFocus(); }, [syncFocus]);
+  const blockCompletion = useFocusBlockCompletion(session, elapsed, showBlockSuccess, syncEndedBlock);
+
   async function act(action: "start" | "pause" | "resume" | "stop" | "discard", extra: { surge?: boolean } = {}) {
     setBusy(true);
     setError(null);
+    setBlockSuccess(null);
     try {
       const selectedCore = core && (!core.subjectId || core.subjectId === subjectId) ? core : null;
-      const r = await apiFetch<{ session: FocusView | null; todayMinutes?: number }>("/api/focus", { body: action === "start" ? {
+      const r = await apiFetch<{ session: FocusView | null; todayMinutes?: number; blockCompleted?: boolean; taskAutoCompleted?: boolean }>("/api/focus", { body: action === "start" ? {
         action,
         subjectId: subjectId || null,
         chapterId: selectedCore?.chapterId ?? null,
@@ -78,6 +97,10 @@ export function TimerCard({ className, subjects, initial, initialMinutesToday, t
         surge: !!extra.surge,
         clientRequestId: requestId(),
       } : { action } });
+      if (r.blockCompleted && r.session) {
+        showBlockSuccess({ ...r, blockCompleted: true, taskAutoCompleted: !!r.taskAutoCompleted });
+        return;
+      }
       if (action === "stop" || action === "discard") {
         if (typeof r.todayMinutes === "number") setMinutesToday(r.todayMinutes);
         else {
@@ -92,6 +115,8 @@ export function TimerCard({ className, subjects, initial, initialMinutesToday, t
       setBusy(false);
     }
   }
+
+  useEffect(() => () => { if (successTimer.current) clearTimeout(successTimer.current); }, []);
 
   // idle detection (F-LOG-07): no interaction for 5 min → "Still there?"; no answer in 60 s → paused (idle)
   const [idleAsk, setIdleAsk] = useState<number | null>(null);
@@ -267,6 +292,11 @@ export function TimerCard({ className, subjects, initial, initialMinutesToday, t
         {error && (
           <p role="alert" className="mt-3 rounded-2xl bg-on-color px-4 py-2 text-body-s font-semibold text-white">
             {error}
+          </p>
+        )}
+        {(blockSuccess || blockCompletion.error) && (
+          <p role={blockSuccess ? "status" : "alert"} aria-live="polite" className={`mt-3 rounded-2xl px-4 py-2 text-body-s font-semibold text-white ${blockSuccess ? "animate-spring bg-emerald-800" : "bg-on-color"}`}>
+            {blockSuccess ?? `Retrying focus sync: ${blockCompletion.error}`}
           </p>
         )}
       </div>

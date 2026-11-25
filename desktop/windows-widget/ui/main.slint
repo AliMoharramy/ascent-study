@@ -224,6 +224,7 @@ export component FocusWidget inherits Window {
     in-out property <bool> session-running: false;
     in-out property <bool> session-active: false;
     in-out property <bool> idle-prompt-visible: false;
+    in-out property <bool> completion-visible: false;
     in-out property <bool> busy: false;
     in-out property <bool> signed-in: false;
     in-out property <bool> backdrop-supported: false;
@@ -240,6 +241,7 @@ export component FocusWidget inherits Window {
     in-out property <string> password: "";
     in-out property <string> task-title: "";
     in-out property <string> message: "";
+    in-out property <string> completion-text: "";
     in-out property <string> suggestion-title: "";
     in-out property <string> suggestion-reason: "";
     in-out property <string> suggestion-minutes: "25 min";
@@ -293,6 +295,11 @@ export component FocusWidget inherits Window {
         interval: 30s;
         running: root.signed-in;
         triggered => { root.reconcile-focus(); }
+    }
+    Timer {
+        interval: 3s;
+        running: root.completion-visible;
+        triggered => { root.completion-visible = false; root.completion-text = ""; }
     }
 
     if !root.panel-open: TimerCapsule {
@@ -509,7 +516,28 @@ export component FocusWidget inherits Window {
                 disabled: root.busy;
                 activated => { root.finish-focus(); }
             }
-            if root.idle-prompt-visible: Text {
+            if root.completion-visible: Rectangle {
+                x: 12px;
+                y: 158px;
+                width: parent.width - 24px;
+                height: 25px;
+                border-radius: 9px;
+                border-width: 1px;
+                border-color: #8ce7cd50;
+                background: #8ce7cd14;
+                Text {
+                    text: root.completion-text;
+                    color: #a3f2d4;
+                    font-size: 9px;
+                    font-weight: 650;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    width: parent.width - 12px;
+                    height: parent.height;
+                    overflow: elide;
+                }
+            }
+            if root.idle-prompt-visible && !root.completion-visible: Text {
                 x: 12px;
                 y: 162px;
                 width: 210px;
@@ -519,7 +547,7 @@ export component FocusWidget inherits Window {
                 font-size: 9px;
                 wrap: word-wrap;
             }
-            if root.idle-prompt-visible: ActionButton {
+            if root.idle-prompt-visible && !root.completion-visible: ActionButton {
                 x: 236px;
                 y: 162px;
                 width: 88px;

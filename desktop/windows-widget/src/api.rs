@@ -60,11 +60,16 @@ struct FocusEnvelope {
     #[serde(default)]
     #[allow(dead_code)]
     today_minutes: Option<f64>,
+    #[serde(default)]
+    block_completed: bool,
+    #[serde(default)]
+    task_auto_completed: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FocusSession {
+    pub id: String,
     pub status: String,
     pub elapsed_ms: i64,
     #[serde(default)]
@@ -75,6 +80,13 @@ pub struct FocusSession {
     pub task_id: Option<String>,
     #[serde(default)]
     pub task_title: Option<String>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct FocusActionResult {
+    pub session: Option<FocusSession>,
+    pub block_completed: bool,
+    pub task_auto_completed: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -328,7 +340,7 @@ impl ApiClient {
         action: &str,
         task: Option<&WidgetTask>,
         fallback_kind: &str,
-    ) -> Result<Option<FocusSession>, ApiError> {
+    ) -> Result<FocusActionResult, ApiError> {
         let mut payload = json!({ "action": action });
         if action == "start" {
             payload["kind"] = json!(fallback_kind);
@@ -348,7 +360,24 @@ impl ApiClient {
             payload["clientRequestId"] = json!(Uuid::new_v4().to_string());
         }
         let response: FocusEnvelope = self.request(Method::POST, "api/focus", Some(payload))?;
-        Ok(response.session.filter(|session| session.status != "ended"))
+        Ok(FocusActionResult {
+            session: response.session.filter(|session| session.status != "ended"),
+            block_completed: response.block_completed,
+            task_auto_completed: response.task_auto_completed,
+        })
+    }
+
+    pub fn complete_focus_block(&self, session_id: &str) -> Result<FocusActionResult, ApiError> {
+        let response: FocusEnvelope = self.request(
+            Method::POST,
+            "api/focus",
+            Some(json!({ "action": "complete-block", "sessionId": session_id })),
+        )?;
+        Ok(FocusActionResult {
+            session: response.session.filter(|session| session.status != "ended"),
+            block_completed: response.block_completed,
+            task_auto_completed: response.task_auto_completed,
+        })
     }
 
     pub fn load_tasks(&self) -> Result<(Vec<WidgetTask>, Preferences), ApiError> {

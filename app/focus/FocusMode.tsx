@@ -8,6 +8,7 @@ import { FOCUS_KIND_OPTIONS, focusKindLabel, type FocusKind } from "@/domain/foc
 import { apiFetch, requestId } from "@/ui/client";
 import { ProgressBar } from "@/ui/components";
 import { Icon } from "@/ui/icons";
+import { useFocusBlockCompletion, type FocusBlockResult } from "@/ui/useFocusBlockCompletion";
 
 const QUOTES = ["One step. Then the next.", "The fog only moves when you do.", "Seed counts. Start.", "Depth beats breadth today."];
 
@@ -17,6 +18,9 @@ export function FocusMode({ initial, today, coreId, coreTitle, chapterId, target
   const [kind, setKind] = useState<FocusKind>(initial?.kind ?? "video");
   const [minutesToday, setMinutesToday] = useState(doneToday);
   const [now, setNow] = useState(Date.now());
+  const [blockSuccess, setBlockSuccess] = useState<string | null>(null);
+  const completedBlockIds = useRef(new Set<string>());
+  const successTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [idleAsk, setIdleAsk] = useState<number | null>(null);
   const lastActive = useRef(Date.now());
   const anchor = useRef(initial ? { c: Date.now(), e: initial.elapsedMs } : null);
@@ -52,7 +56,11 @@ export function FocusMode({ initial, today, coreId, coreTitle, chapterId, target
     };
   }, [syncFocus]);
   async function act(action: string, extra: Record<string, unknown> = {}) {
-    const r = await apiFetch<{ session: FocusView | null }>("/api/focus", { body: { action, ...extra } });
+    const r = await apiFetch<{ session: FocusView | null; todayMinutes?: number; blockCompleted?: boolean; taskAutoCompleted?: boolean }>("/api/focus", { body: { action, ...extra } });
+    if (r.blockCompleted && r.session) {
+      showBlockSuccess({ ...r, blockCompleted: true, taskAutoCompleted: !!r.taskAutoCompleted });
+      return;
+    }
     if (action === "stop") {
       router.push("/today");
       return;
@@ -97,6 +105,19 @@ export function FocusMode({ initial, today, coreId, coreTitle, chapterId, target
     };
   }, [s?.status, idleAsk, apply]);
   const elapsed = s && anchor.current ? anchor.current.e + (s.status === "running" ? now - anchor.current.c : 0) : 0;
+  const showBlockSuccess = useCallback((result: FocusBlockResult) => {
+    const id = result.session?.id;
+    if (id && completedBlockIds.current.has(id)) return;
+    if (id) completedBlockIds.current.add(id);
+    if (typeof result.todayMinutes === "number") setMinutesToday(result.todayMinutes);
+    apply(null);
+    setBlockSuccess(result.taskAutoCompleted ? "25-minute block complete · task completed" : "25-minute focus block complete");
+    if (successTimer.current) clearTimeout(successTimer.current);
+    successTimer.current = setTimeout(() => setBlockSuccess(null), 5_000);
+  }, [apply]);
+  const syncEndedBlock = useCallback(() => { void syncFocus(); }, [syncFocus]);
+  const blockCompletion = useFocusBlockCompletion(s, elapsed, showBlockSuccess, syncEndedBlock);
+  useEffect(() => () => { if (successTimer.current) clearTimeout(successTimer.current); }, []);
   const sessionCountsToday = s?.gameDay === today;
   const completedToday = Math.max(0, minutesToday - (sessionCountsToday ? Math.floor(s!.elapsedMs / 60_000) : 0));
   const mins = completedToday + (sessionCountsToday ? Math.floor(elapsed / 60_000) : 0);
@@ -118,6 +139,11 @@ export function FocusMode({ initial, today, coreId, coreTitle, chapterId, target
           {coreTitle}
         </p>
         {s?.taskTitle && <p className="text-body font-bold" dir="auto">Working on: {s.taskTitle}</p>}
+        {(blockSuccess || blockCompletion.error) && (
+          <p role={blockSuccess ? "status" : "alert"} aria-live="polite" className={`rounded-2xl px-4 py-3 text-body-s font-bold text-white ${blockSuccess ? "animate-spring bg-emerald-800" : "bg-on-color"}`}>
+            {blockSuccess ?? `Retrying focus sync: ${blockCompletion.error}`}
+          </p>
+        )}
         {s && (
           <div className="flex flex-wrap justify-center gap-2">
             <span className="chip">{focusKindLabel(s.kind)}</span>
