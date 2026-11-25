@@ -11,6 +11,9 @@ import {
   primaryKey,
   text,
 } from "drizzle-orm/pg-core";
+import type { FocusKind } from "@/domain/focus";
+
+export type { FocusKind };
 
 // Drizzle overrides pg's TIMESTAMPTZ parser, so normalize at the column boundary.
 const ts = customType<{ data: string; driverData: string }>({
@@ -60,7 +63,6 @@ export const events = pgTable("events", {
   gameDay: day("game_day"),
 });
 
-export type FocusKind = "video" | "tests" | "review" | "analysis" | "forge" | "other";
 export type FocusStatus = "running" | "paused" | "ended";
 
 export const focusSessions = pgTable("focus_sessions", {
@@ -69,6 +71,8 @@ export const focusSessions = pgTable("focus_sessions", {
   subjectId: text("subject_id"),
   chapterId: text("chapter_id"),
   taskTitle: text("task_title"),
+  taskSource: text("task_source"),
+  taskId: text("task_id"),
   kind: text("kind").$type<FocusKind>().notNull(),
   status: text("status").$type<FocusStatus>().notNull(),
   startedAt: ts("started_at").notNull(),

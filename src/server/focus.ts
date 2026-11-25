@@ -2,6 +2,8 @@ import { and, desc, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { withUserTransaction, type Db } from "@/db/client";
 import { focusSessions, type FocusKind } from "@/db/schema";
+import { FOCUS_KINDS } from "@/domain/focus";
+export { FOCUS_KINDS };
 import { elapsedMs, focusedMinutes, pauseTimer, resumeTimer, startTimer, stopTimer, TimerError, type TimerState } from "@/domain/timer";
 import { appendEvent, EventRequestConflict, replayOf } from "@/events/store";
 import { newId, nowIso } from "@/lib/ids";
@@ -9,13 +11,13 @@ import { gameDay, gameDayBounds, localToUtc } from "@/lib/time";
 
 /** Focus session service (F-LOG-01): server-clock timer persisted in `focus_sessions`. */
 
-export const FOCUS_KINDS = ["video", "tests", "review", "analysis", "forge", "other"] as const;
-
 export const startFocusInput = z.object({
   subjectId: z.string().max(40).nullish(),
   chapterId: z.string().max(60).nullish(),
+  taskSource: z.enum(["Today", "Courses", "Mine", "AI"]).nullish(),
+  taskId: z.string().max(120).nullish(),
   taskTitle: z.string().trim().min(1).max(200).nullish(),
-  kind: z.enum(FOCUS_KINDS).default("other"),
+  kind: z.enum(FOCUS_KINDS).default("video"),
   surge: z.boolean().optional(),
   note: z.string().max(500).nullish(),
   clientRequestId: z.string().max(80).nullish(),
@@ -30,6 +32,8 @@ export interface FocusView {
   kind: FocusKind;
   subjectId: string | null;
   chapterId: string | null;
+  taskSource: string | null;
+  taskId: string | null;
   taskTitle: string | null;
   status: Row["status"];
   startedAt: string;
@@ -49,6 +53,8 @@ export function view(r: Row, now = new Date()): FocusView {
     kind: r.kind,
     subjectId: r.subjectId,
     chapterId: r.chapterId,
+    taskSource: r.taskSource,
+    taskId: r.taskId,
     taskTitle: r.taskTitle,
     status: r.status,
     startedAt: r.startedAt,
@@ -101,6 +107,8 @@ export async function startFocus(db: Db, userId: string, input: z.input<typeof s
       userId,
       subjectId: data.subjectId ?? null,
       chapterId: data.chapterId ?? null,
+      taskSource: data.taskSource ?? null,
+      taskId: data.taskId ?? null,
       taskTitle: data.taskTitle ?? null,
       kind: data.kind,
       status: s.status,

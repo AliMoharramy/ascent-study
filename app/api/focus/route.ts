@@ -26,16 +26,23 @@ export const POST = api(async ({ db, userId, req, session }) => {
     case "resume":
       row = (await resumeFocus(db, userId));
       break;
-    case "stop":
+    case "stop": {
       row = (await stopFocus(db, userId));
-      return { session: view(row), ...(await afterLog(db, userId, row.gameDay, { chapterId: row.chapterId })) };
+      const stoppedToday = gameDay(new Date(), session.user.timezone, session.user.rolloverHour);
+      return { session: view(row), todayMinutes: await minutesForDay(db, userId, stoppedToday), ...(await afterLog(db, userId, row.gameDay, { chapterId: row.chapterId })) };
+    }
     case "idle":
       row = (await idlePause(db, userId));
-      if (!row) return { session: null };
+      if (!row) {
+        const current = await openSession(db, userId);
+        return { session: current ? view(current) : null };
+      }
       break;
-    case "discard":
+    case "discard": {
       (await discardFocus(db, userId));
-      return { session: null };
+      const discardedToday = gameDay(new Date(), session.user.timezone, session.user.rolloverHour);
+      return { session: null, todayMinutes: await minutesForDay(db, userId, discardedToday) };
+    }
   }
   return { session: view(row) };
 });
