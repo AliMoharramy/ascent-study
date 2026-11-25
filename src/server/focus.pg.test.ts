@@ -96,7 +96,12 @@ describe("PostgreSQL focus transactions", () => {
 
     const retry = await completeFocusBlock(fixture.db, userId, started.id, new Date(now.getTime() + 26 * 60_000));
     expect(retry).toMatchObject({ blockCompleted: true, taskAutoCompleted: true, session: { id: started.id } });
-    expect(await listEvents(fixture.db, userId, "focus.stopped")).toHaveLength(1);
+    const stoppedEvents = await listEvents(fixture.db, userId, "focus.stopped");
+    expect(stoppedEvents).toHaveLength(1);
+    expect(stoppedEvents[0]).toMatchObject({
+      clientRequestId: `focus-block-${started.id}`,
+      payload: { request: { sessionId: started.id, blockMinutes: 25 }, taskAutoCompleted: true },
+    });
     expect(await listEvents(fixture.db, userId, "personal_task.completed")).toHaveLength(1);
   });
 

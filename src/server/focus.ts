@@ -100,7 +100,7 @@ async function completeSelectedFocusTask(tx: Db, userId: string, session: Row): 
     if (!task || task.status === "done") return false;
     await updatePersonalTask(tx, userId, task.id, {
       status: "done",
-      clientRequestId: `focus-block-${session.id}`,
+      clientRequestId: `focus-task-${session.id}`,
     });
     return true;
   }
@@ -135,6 +135,17 @@ async function completeSelectedFocusTask(tx: Db, userId: string, session: Row): 
 }
 
 async function finishFocusBlock(tx: Db, userId: string, session: Row): Promise<Row> {
+  const request = { sessionId: session.id, blockMinutes: FOCUS_BLOCK_MINUTES };
+  const clientRequestId = `focus-block-${session.id}`;
+  const prior = await replayFocus(tx, userId, "focus.stopped", clientRequestId, request);
+  if (prior) {
+    const original = (await tx.select().from(focusSessions)
+      .where(and(eq(focusSessions.id, session.id), eq(focusSessions.userId, userId)))
+      .limit(1))[0];
+    if (!original || original.status !== "ended") throw new FocusConflict("The completed focus block is inconsistent — refresh and try again");
+    return original;
+  }
+
   const endedAt = new Date(Date.parse(session.startedAt) + session.pausedMs + FOCUS_BLOCK_MS);
   const state = stopTimer(toState(session), endedAt);
   const taskAutoCompleted = await completeSelectedFocusTask(tx, userId, session);
@@ -163,14 +174,16 @@ async function finishFocusBlock(tx: Db, userId: string, session: Row): Promise<R
       gameDay: session.gameDay,
       blockMinutes: FOCUS_BLOCK_MINUTES,
       taskAutoCompleted,
+      request,
     },
     occurredAt: endedAt.toISOString(),
+    clientRequestId,
   });
   return (await tx.select().from(focusSessions).where(eq(focusSessions.id, session.id)).limit(1))[0]!;
 }
 
 /** A reused request key is a conflict from the caller's point of view, like any other focus conflict. */
-async function replayFocus(tx: Db, userId: string, type: "focus.started" | "focus.manual", clientRequestId: string | null | undefined, request: Record<string, unknown>) {
+async function replayFocus(tx: Db, userId: string, type: "focus.started" | "focus.manual" | "focus.stopped", clientRequestId: string | null | undefined, request: Record<string, unknown>) {
   try {
     return await replayOf(tx, userId, type, clientRequestId, request);
   } catch (error) {

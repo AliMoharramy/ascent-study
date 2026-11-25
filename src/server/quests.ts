@@ -25,6 +25,8 @@ import { isRestDay } from "./restDays";
 
 export type QuestRow = typeof quests.$inferSelect;
 
+export class QuestActionDenied extends Error {}
+
 export const baselineConfirmed = async (db: Db, userId: string) => (await getKv<{ on: string } | null>(db, userId, "baseline.confirmed", null));
 /** Rules (penalties, Rival) are active only after the Baseline is confirmed and week 1 is over (doc 05 §4.1). */
 export const rulesActive = async (db: Db, userId: string, day: string) => !!(await baselineConfirmed(db, userId)) && weekNoOf(day) > 1;
@@ -186,6 +188,17 @@ export async function setQuestTier(db: Db, userId: string, questId: string, tier
   return await withUserTransaction(db, userId, async (tx) => {
   const q = (await tx.select().from(quests).where(and(eq(quests.id, questId), eq(quests.userId, userId))).limit(1))[0];
   if (!q) throw new Error("Unknown quest");
+  if (!q.habitId) {
+    let target: QuestTarget;
+    try {
+      target = JSON.parse(q.targetJson) as QuestTarget;
+    } catch {
+      throw new QuestActionDenied("This quest cannot be manually completed");
+    }
+    if (target.metric !== "check") {
+      throw new QuestActionDenied("This quest is completed from its tracked study activity");
+    }
+  }
   if (q.habitId) {
     // pillar quests are habits: log the habit (XP is projected from habit.logged)
     const h = (await tx.select().from(habits).where(eq(habits.id, q.habitId)).limit(1))[0];

@@ -7,7 +7,7 @@ import { CSRF_COOKIE, SESSION_COOKIE, csrfMatches, getSessionUser, type SessionU
 import { EventRequestConflict } from "@/events/store";
 import { CheckinLocked } from "./checkins";
 import { FocusConflict } from "./focus";
-import { LifeEventDenied, ShieldDenied } from "./quests";
+import { LifeEventDenied, QuestActionDenied, ShieldDenied } from "./quests";
 import { HabitLimit } from "./habits";
 import { ResetWeekDenied } from "./plan";
 import { UndoDenied } from "./undo";
@@ -21,7 +21,7 @@ import { ProposalDenied } from "./coach";
 import { ExperimentDenied } from "./experiments";
 import { takeToken } from "./ratelimit";
 
-const RULE_ERRORS = [LifeEventDenied, ShieldDenied, HabitLimit, ResetWeekDenied, UndoDenied, ClaimDenied, RestDayDenied, LifeDenied, ExtrasDenied, LearningDenied, BuddyConsentRequired, ProposalDenied, ExperimentDenied];
+const RULE_ERRORS = [LifeEventDenied, QuestActionDenied, ShieldDenied, HabitLimit, ResetWeekDenied, UndoDenied, ClaimDenied, RestDayDenied, LifeDenied, ExtrasDenied, LearningDenied, BuddyConsentRequired, ProposalDenied, ExperimentDenied];
 
 /**
  * Route-handler wrapper: session auth (401), CSRF on mutating requests (403), zod validation (400),
