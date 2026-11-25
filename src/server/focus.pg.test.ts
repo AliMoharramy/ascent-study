@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, type TestDb } from "@/db/testing";
-import { focusSessions } from "@/db/schema";
+import { focusSessions, personalTasks } from "@/db/schema";
 import { createUser } from "./auth";
-import { FocusConflict, idlePause, manualFocus, minutesForDay, openSession, pauseFocus, resumeFocus, startFocus, stopFocus } from "./focus";
+import { completeFocusBlock, discardFocus, FocusConflict, idlePause, manualFocus, minutesForDay, openSession, pauseFocus, resumeFocus, startFocus, stopFocus } from "./focus";
 import { listEvents } from "@/events/store";
 
 let fixture: TestDb;
@@ -57,6 +57,60 @@ describe("PostgreSQL focus transactions", () => {
       taskTitle: "Review chapter 4",
       status: "paused",
     });
+  });
+
+  it("stops at 25 active minutes and completes the selected personal task once", async () => {
+    const taskId = "mine-focus-block";
+    await fixture.db.insert(personalTasks).values({
+      id: taskId,
+      userId,
+      title: "Review chapter 4",
+      status: "open",
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      completedAt: null,
+    });
+    const started = await startFocus(fixture.db, userId, {
+      kind: "video",
+      taskSource: "Mine",
+      taskId,
+      taskTitle: "Review chapter 4",
+    }, { now });
+
+    const early = await completeFocusBlock(fixture.db, userId, started.id, new Date(now.getTime() + 24 * 60_000 + 59_000));
+    expect(early.blockCompleted).toBe(false);
+    expect(early.session.status).toBe("running");
+
+    const completed = await completeFocusBlock(fixture.db, userId, started.id, new Date(now.getTime() + 25 * 60_000 + 30_000));
+    expect(completed).toMatchObject({
+      blockCompleted: true,
+      taskAutoCompleted: true,
+      session: {
+        status: "ended",
+        minutes: 25,
+        endedAt: "2026-11-14T00:54:00.000Z",
+        taskAutoCompleted: true,
+      },
+    });
+    expect(await fixture.db.select().from(personalTasks)).toMatchObject([{ id: taskId, status: "done" }]);
+
+    const retry = await completeFocusBlock(fixture.db, userId, started.id, new Date(now.getTime() + 26 * 60_000));
+    expect(retry).toMatchObject({ blockCompleted: true, taskAutoCompleted: true, session: { id: started.id } });
+    expect(await listEvents(fixture.db, userId, "focus.stopped")).toHaveLength(1);
+    expect(await listEvents(fixture.db, userId, "personal_task.completed")).toHaveLength(1);
+  });
+
+  it("does not let discard erase a block once 25 active minutes have elapsed", async () => {
+    const started = await startFocus(fixture.db, userId, { kind: "review" }, { now });
+    const result = await discardFocus(fixture.db, userId, new Date(now.getTime() + 25 * 60_000));
+
+    expect(result).toMatchObject({
+      blockCompleted: true,
+      taskAutoCompleted: false,
+      session: { id: started.id, status: "ended", minutes: 25 },
+    });
+    expect(await listEvents(fixture.db, userId, "focus.discarded")).toHaveLength(0);
+    expect(await listEvents(fixture.db, userId, "focus.stopped")).toHaveLength(1);
   });
 
   it("increments idle pauses once per running-to-paused transition", async () => {

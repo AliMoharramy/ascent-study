@@ -73,6 +73,7 @@ export const focusSessions = pgTable("focus_sessions", {
   taskTitle: text("task_title"),
   taskSource: text("task_source"),
   taskId: text("task_id"),
+  taskAutoCompleted: boolean("task_auto_completed").notNull().default(false),
   kind: text("kind").$type<FocusKind>().notNull(),
   status: text("status").$type<FocusStatus>().notNull(),
   startedAt: ts("started_at").notNull(),

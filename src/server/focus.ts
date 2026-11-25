@@ -1,13 +1,16 @@
 import { and, desc, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { withUserTransaction, type Db } from "@/db/client";
-import { focusSessions, type FocusKind } from "@/db/schema";
+import { courses, focusSessions, habitLogs, lessons, personalTasks, quests, type FocusKind } from "@/db/schema";
 import { FOCUS_KINDS } from "@/domain/focus";
 export { FOCUS_KINDS };
-import { elapsedMs, focusedMinutes, pauseTimer, resumeTimer, startTimer, stopTimer, TimerError, type TimerState } from "@/domain/timer";
+import { elapsedMs, FOCUS_BLOCK_MINUTES, FOCUS_BLOCK_MS, focusedMinutes, isFocusBlockDue, pauseTimer, resumeTimer, startTimer, stopTimer, TimerError, type TimerState } from "@/domain/timer";
 import { appendEvent, EventRequestConflict, replayOf } from "@/events/store";
 import { newId, nowIso } from "@/lib/ids";
 import { gameDay, gameDayBounds, localToUtc } from "@/lib/time";
+import { setLessonStatus } from "./courses";
+import { updatePersonalTask } from "./personalTasks";
+import { setQuestTier } from "./quests";
 
 /** Focus session service (F-LOG-01): server-clock timer persisted in `focus_sessions`. */
 
@@ -35,6 +38,7 @@ export interface FocusView {
   taskSource: string | null;
   taskId: string | null;
   taskTitle: string | null;
+  taskAutoCompleted: boolean;
   status: Row["status"];
   startedAt: string;
   pausedAt: string | null;
@@ -56,6 +60,7 @@ export function view(r: Row, now = new Date()): FocusView {
     taskSource: r.taskSource,
     taskId: r.taskId,
     taskTitle: r.taskTitle,
+    taskAutoCompleted: r.taskAutoCompleted,
     status: r.status,
     startedAt: r.startedAt,
     pausedAt: r.pausedAt,
@@ -73,6 +78,96 @@ export async function openSession(db: Db, userId: string): Promise<Row | undefin
 }
 
 export class FocusConflict extends Error {}
+
+async function completeSelectedFocusTask(tx: Db, userId: string, session: Row): Promise<boolean> {
+  if (!session.taskSource || !session.taskId) return false;
+
+  if (session.taskSource === "Courses") {
+    const lesson = (await tx.select({ id: lessons.id, courseId: lessons.courseId, status: lessons.status })
+      .from(lessons)
+      .innerJoin(courses, eq(lessons.courseId, courses.id))
+      .where(and(eq(lessons.id, session.taskId), eq(courses.userId, userId)))
+      .limit(1))[0];
+    if (!lesson || lesson.status === "done") return false;
+    await setLessonStatus(tx, userId, lesson.id, "done");
+    return true;
+  }
+
+  if (session.taskSource === "Mine") {
+    const task = (await tx.select().from(personalTasks)
+      .where(and(eq(personalTasks.id, session.taskId), eq(personalTasks.userId, userId)))
+      .limit(1))[0];
+    if (!task || task.status === "done") return false;
+    await updatePersonalTask(tx, userId, task.id, {
+      status: "done",
+      clientRequestId: `focus-block-${session.id}`,
+    });
+    return true;
+  }
+
+  if (session.taskSource === "Today") {
+    const quest = (await tx.select().from(quests)
+      .where(and(eq(quests.id, session.taskId), eq(quests.userId, userId)))
+      .limit(1))[0];
+    if (!quest || quest.status !== "open") return false;
+    let metric: unknown;
+    try {
+      metric = (JSON.parse(quest.targetJson) as { metric?: unknown }).metric;
+    } catch {
+      return false;
+    }
+    if (!quest.habitId && metric !== "check") return false;
+
+    if (quest.habitId) {
+      const existingLog = (await tx.select({ tierDone: habitLogs.tierDone })
+        .from(habitLogs)
+        .where(and(eq(habitLogs.habitId, quest.habitId), eq(habitLogs.userId, userId), eq(habitLogs.date, quest.date)))
+        .limit(1))[0];
+      if (existingLog?.tierDone === "standard" || existingLog?.tierDone === "stretch") return false;
+    }
+
+    if (quest.tierDone === "standard" || quest.tierDone === "stretch") return false;
+    await setQuestTier(tx, userId, quest.id, "standard");
+    return true;
+  }
+
+  return false;
+}
+
+async function finishFocusBlock(tx: Db, userId: string, session: Row): Promise<Row> {
+  const endedAt = new Date(Date.parse(session.startedAt) + session.pausedMs + FOCUS_BLOCK_MS);
+  const state = stopTimer(toState(session), endedAt);
+  const taskAutoCompleted = await completeSelectedFocusTask(tx, userId, session);
+  const minutes = focusedMinutes(state, endedAt);
+  await tx.update(focusSessions)
+    .set({
+      status: state.status,
+      pausedAt: state.pausedAt,
+      pausedMs: state.pausedMs,
+      endedAt: state.endedAt,
+      minutes,
+      taskAutoCompleted,
+      updatedAt: endedAt.toISOString(),
+    })
+    .where(and(eq(focusSessions.id, session.id), eq(focusSessions.userId, userId)));
+  await appendEvent(tx, {
+    userId,
+    type: "focus.stopped",
+    payload: {
+      sessionId: session.id,
+      minutes,
+      kind: session.kind,
+      subjectId: session.subjectId,
+      chapterId: session.chapterId,
+      surge: session.surge,
+      gameDay: session.gameDay,
+      blockMinutes: FOCUS_BLOCK_MINUTES,
+      taskAutoCompleted,
+    },
+    occurredAt: endedAt.toISOString(),
+  });
+  return (await tx.select().from(focusSessions).where(eq(focusSessions.id, session.id)).limit(1))[0]!;
+}
 
 /** A reused request key is a conflict from the caller's point of view, like any other focus conflict. */
 async function replayFocus(tx: Db, userId: string, type: "focus.started" | "focus.manual", clientRequestId: string | null | undefined, request: Record<string, unknown>) {
@@ -130,15 +225,42 @@ async function transition(db: Db, userId: string, op: "pause" | "resume" | "stop
   return await withUserTransaction(db, userId, async (tx) => {
     const r = await openSession(tx, userId);
     if (!r) throw new TimerError("No running session");
+    const current = toState(r);
+    if (isFocusBlockDue(current.status, elapsedMs(current, now))) return await finishFocusBlock(tx, userId, r);
     const fn = op === "pause" ? pauseTimer : op === "resume" ? resumeTimer : stopTimer;
-    const s = fn(toState(r), now);
+    const s = fn(current, now);
     const minutes = s.status === "ended" ? focusedMinutes(s, now) : null;
     await tx.update(focusSessions)
-      .set({ status: s.status, pausedAt: s.pausedAt, pausedMs: s.pausedMs, endedAt: s.endedAt, minutes, updatedAt: nowIso() })
+      .set({ status: s.status, pausedAt: s.pausedAt, pausedMs: s.pausedMs, endedAt: s.endedAt, minutes, taskAutoCompleted: false, updatedAt: nowIso() })
       .where(eq(focusSessions.id, r.id));
     const type = op === "pause" ? "focus.paused" : op === "resume" ? "focus.resumed" : "focus.stopped";
     await appendEvent(tx, { userId, type, payload: { sessionId: r.id, ...(minutes !== null ? { minutes, kind: r.kind, subjectId: r.subjectId, chapterId: r.chapterId, surge: r.surge, gameDay: r.gameDay } : {}) }, occurredAt: now.toISOString() });
     return (await tx.select().from(focusSessions).where(eq(focusSessions.id, r.id)).limit(1))[0]!;
+  });
+}
+
+export async function completeFocusBlock(db: Db, userId: string, sessionId: string, now = new Date()): Promise<{ session: Row; blockCompleted: boolean; taskAutoCompleted: boolean }> {
+  return await withUserTransaction(db, userId, async (tx) => {
+    const current = await openSession(tx, userId);
+    if (!current || current.id !== sessionId) {
+      const prior = (await tx.select().from(focusSessions)
+        .where(and(eq(focusSessions.id, sessionId), eq(focusSessions.userId, userId)))
+        .limit(1))[0];
+      if (prior?.status === "ended") {
+        const blockCompleted = !prior.manual && (prior.minutes ?? 0) >= FOCUS_BLOCK_MINUTES;
+        return { session: prior, blockCompleted, taskAutoCompleted: prior.taskAutoCompleted };
+      }
+      if (current) throw new FocusConflict("The active focus session changed before the block completed");
+      throw new TimerError("No running session");
+    }
+
+    const state = toState(current);
+    if (!isFocusBlockDue(state.status, elapsedMs(state, now))) {
+      return { session: current, blockCompleted: false, taskAutoCompleted: false };
+    }
+
+    const session = await finishFocusBlock(tx, userId, current);
+    return { session, blockCompleted: true, taskAutoCompleted: session.taskAutoCompleted };
   });
 }
 
@@ -147,12 +269,18 @@ export const resumeFocus = (db: Db, userId: string, now?: Date) => transition(db
 export const stopFocus = (db: Db, userId: string, now?: Date) => transition(db, userId, "stop", now);
 
 /** Throws away an accidental session (no minutes recorded). */
-export async function discardFocus(db: Db, userId: string): Promise<void> {
-  await withUserTransaction(db, userId, async (tx) => {
+export async function discardFocus(db: Db, userId: string, now = new Date()): Promise<{ session: Row | null; blockCompleted: boolean; taskAutoCompleted: boolean }> {
+  return await withUserTransaction(db, userId, async (tx) => {
     const r = await openSession(tx, userId);
-    if (!r) return;
+    if (!r) return { session: null, blockCompleted: false, taskAutoCompleted: false };
+    const state = toState(r);
+    if (isFocusBlockDue(state.status, elapsedMs(state, now))) {
+      const session = await finishFocusBlock(tx, userId, r);
+      return { session, blockCompleted: true, taskAutoCompleted: session.taskAutoCompleted };
+    }
     await tx.delete(focusSessions).where(eq(focusSessions.id, r.id));
     await appendEvent(tx, { userId, type: "focus.discarded", payload: { sessionId: r.id } });
+    return { session: null, blockCompleted: false, taskAutoCompleted: false };
   });
 }
 
@@ -172,6 +300,7 @@ export async function idlePause(db: Db, userId: string, now = new Date()) {
     const r = await openSession(tx, userId);
     if (!r || r.status !== "running") return null;
     const paused = await pauseFocus(tx, userId, now);
+    if (paused.status === "ended") return paused;
     await tx.update(focusSessions).set({ idlePauses: r.idlePauses + 1 }).where(eq(focusSessions.id, r.id));
     await appendEvent(tx, { userId, type: "focus.idle", payload: { sessionId: r.id } });
     return paused;

@@ -1,9 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { elapsedMs, focusedMinutes, formatClock, pauseTimer, resumeTimer, startTimer, stopTimer, TimerError } from "./timer";
+import { elapsedMs, focusedMinutes, formatClock, isFocusBlockDue, pauseTimer, resumeTimer, startTimer, stopTimer, TimerError } from "./timer";
 
 const at = (min: number) => new Date(Date.UTC(2026, 10, 14, 8, 0, 0) + min * 60_000);
 
 describe("focus timer (F-LOG-01)", () => {
+  it("completes only a running block after 25 active minutes", () => {
+    expect(isFocusBlockDue("running", 24 * 60_000 + 59_000)).toBe(false);
+    expect(isFocusBlockDue("running", 25 * 60_000)).toBe(true);
+    expect(isFocusBlockDue("paused", 24 * 60_000 + 59_000)).toBe(false);
+    expect(isFocusBlockDue("paused", 25 * 60_000)).toBe(true);
+  });
+
+  it("excludes paused time from the 25-minute block", () => {
+    const paused = pauseTimer(startTimer(at(0)), at(10));
+    expect(elapsedMs(paused, at(100))).toBe(10 * 60_000);
+    const resumed = resumeTimer(paused, at(100));
+    expect(isFocusBlockDue(resumed.status, elapsedMs(resumed, at(114)) + 59_000)).toBe(false);
+    expect(isFocusBlockDue(resumed.status, elapsedMs(resumed, at(115)))).toBe(true);
+  });
+
   it("start → stop measures wall time", () => {
     const s = stopTimer(startTimer(at(0)), at(30));
     expect(s.status).toBe("ended");
