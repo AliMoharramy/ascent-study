@@ -149,7 +149,7 @@ export default async function TodayPage() {
         </Card>
       )}
 
-      <TimerCard className="md:col-span-6 xl:col-span-7 xl:row-span-2" subjects={activeSubjects} initial={open ? view(open) : null} initialMinutesToday={minutesToday} tz={tz} rollover={rollover} core={core} heroState={heroState} mascots={cfg.flags.mascots} />
+      <TimerCard className="md:col-span-6 xl:col-span-7 xl:row-span-2" subjects={activeSubjects} initial={open ? view(open) : null} initialMinutesToday={minutesToday} today={today} tz={tz} rollover={rollover} core={core} heroState={heroState} mascots={cfg.flags.mascots} />
 
       <Card tone="mint" className="flex flex-col items-start gap-4 md:col-span-6 xl:col-span-5 sm:flex-row sm:items-center">
         <MascotSlot character="archie" state={archieState} size="md" enabled={cfg.flags.mascots} />

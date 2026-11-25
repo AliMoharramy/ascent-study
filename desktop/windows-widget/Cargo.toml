@@ -14,7 +14,7 @@ keyring = { version = "=4.2.0", default-features = false, features = ["v1"] }
 raw-window-handle = "0.6"
 url = "2"
 uuid = { version = "=1.29.0", default-features = false, features = ["v4", "std"] }
-windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_System_SystemInformation", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging"] }
 
 [build-dependencies]
 slint-build = "=1.19.0"

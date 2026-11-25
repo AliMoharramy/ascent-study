@@ -87,11 +87,11 @@ describe("focus timer service (T-R0-06)", () => {
         // "refresh": state is read back from the DB
         expect(view((await openSession(db, userId))!, t("2026-11-14T06:30:00Z")).minutes).toBe(20);
         (await resumeFocus(db, userId, t("2026-11-14T06:30:00Z")));
-        const done = (await stopFocus(db, userId, t("2026-11-14T06:55:00Z")));
-        expect(done.minutes).toBe(45);
+        const done = (await stopFocus(db, userId, t("2026-11-14T06:35:00Z")));
+        expect(done.minutes).toBe(25);
         expect(done.gameDay).toBe("2026-11-14");
         expect((await openSession(db, userId))).toBeUndefined();
-        expect((await minutesForDay(db, userId, "2026-11-14"))).toBe(45);
+        expect((await minutesForDay(db, userId, "2026-11-14"))).toBe(25);
         expect((await listEvents(db, userId)).map((e) => e.type)).toEqual(["focus.started", "focus.paused", "focus.resumed", "focus.stopped"]);
     });
     it("a session at 01:30 Tehran counts for the previous day", async () => {
@@ -203,7 +203,10 @@ describe("courses & lessons (T-R1-02)", () => {
         expect(c.course.sessions).toBe(100);
         expect(c.course.durationMin).toBe(3000);
         expect(c.course.estimated).toBe(false);
-        (await setLessonStatus(db, userId, c.lessons[0]!.id, "done"));
+        const lessonRequestId = "lesson-done-once";
+        (await setLessonStatus(db, userId, c.lessons[0]!.id, "done", lessonRequestId));
+        (await setLessonStatus(db, userId, c.lessons[0]!.id, "done", lessonRequestId));
+        expect((await listEvents(db, userId, "lesson.status_changed")).filter((event) => event.payload.lessonId === c.lessons[0]!.id)).toHaveLength(1);
         (await setLessonStatus(db, userId, c.lessons[1]!.id, "watching"));
         expect((await setLessonChapters(db, userId, c.lessons[0]!.id, ["dsa-4", "dsa-5", "nope-1"]))).toEqual(["dsa-4", "dsa-5"]);
         const listed = (await listCourses(db, "dsa")).find((x) => x.id === id)!;

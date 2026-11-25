@@ -3,19 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FocusView } from "@/server/focus";
 import { formatClock } from "@/domain/timer";
+import { FOCUS_KIND_OPTIONS, focusKindLabel, type FocusKind } from "@/domain/focus";
 import { apiFetch, requestId } from "@/ui/client";
 import { MascotSlot, type HeroMascotState } from "@/ui/Mascot";
 import { Chip, cx, Eyebrow, ProgressBar } from "@/ui/components";
 import { Icon } from "@/ui/icons";
+import { useFocusBlockCompletion, type FocusBlockResult } from "@/ui/useFocusBlockCompletion";
 
 type Subject = { id: string; nameEn: string; nameFa: string };
-const KINDS = [
-  { id: "video", label: "Video" },
-  { id: "tests", label: "Tests" },
-  { id: "review", label: "Review" },
-  { id: "analysis", label: "Error analysis" },
-  { id: "other", label: "Other" },
-] as const;
 
 export type CoreQuest = { id: string; title: string; tiers: Record<"seed" | "standard" | "stretch", string>; target: { seed: number; standard: number; stretch: number }; chapterId: string | null; subjectId: string | null; tierDone: "seed" | "standard" | "stretch" | null; progress: number };
 const TIER_LABEL = { seed: "Seed", standard: "Standard", stretch: "Stretch" } as const;
@@ -24,19 +19,23 @@ const TIER_LABEL = { seed: "Seed", standard: "Standard", stretch: "Stretch" } as
  * HeroFocusCard + focus timer (F-LOG-01). Time comes from the server: we store the offset between server and
  * client clocks and render elapsed = server elapsed + local delta. Refresh/closing the tab loses nothing.
  */
-export function TimerCard({ className, subjects, initial, initialMinutesToday, core, heroState = "idle", mascots = true }: { className?: string; subjects: Subject[]; initial: FocusView | null; initialMinutesToday: number; tz: string; rollover: number; core?: CoreQuest | null; heroState?: HeroMascotState; mascots?: boolean }) {
+export function TimerCard({ className, subjects, initial, initialMinutesToday, today, core, heroState = "idle", mascots = true }: { className?: string; subjects: Subject[]; initial: FocusView | null; initialMinutesToday: number; today: string; tz: string; rollover: number; core?: CoreQuest | null; heroState?: HeroMascotState; mascots?: boolean }) {
   const DAILY_TARGET_MIN = core?.target.standard ?? 240;
   const [session, setSession] = useState<FocusView | null>(initial);
   const [minutesToday, setMinutesToday] = useState(initialMinutesToday);
   const [subjectId, setSubjectId] = useState<string>(initial?.subjectId ?? core?.subjectId ?? subjects[0]?.id ?? "");
-  const [kind, setKind] = useState<string>(initial?.kind ?? "video");
+  const [kind, setKind] = useState<FocusKind>(initial?.kind ?? "video");
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [blockSuccess, setBlockSuccess] = useState<string | null>(null);
+  const completedBlockIds = useRef(new Set<string>());
+  const successTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const anchor = useRef<{ client: number; elapsed: number } | null>(initial ? { client: Date.now(), elapsed: initial.elapsedMs } : null);
 
   const apply = useCallback((v: FocusView | null) => {
     setSession(v);
+    if (v) setKind(v.kind);
     anchor.current = v ? { client: Date.now(), elapsed: v.elapsedMs } : null;
   }, []);
 
@@ -46,29 +45,68 @@ export function TimerCard({ className, subjects, initial, initialMinutesToday, c
     return () => clearInterval(t);
   }, [session?.status]);
 
-  // re-sync when the tab becomes visible again (laptop sleep etc.)
-  useEffect(() => {
-    const onVis = async () => {
-      if (document.visibilityState !== "visible") return;
-      const r = await apiFetch<{ session: FocusView | null; todayMinutes: number }>("/api/focus").catch(() => null);
-      if (r) {
-        apply(r.session);
-        setMinutesToday(r.todayMinutes);
-      }
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
+  // Keep the website and native widget on the same server-owned session.
+  const syncFocus = useCallback(async () => {
+    const r = await apiFetch<{ session: FocusView | null; todayMinutes: number }>("/api/focus").catch(() => null);
+    if (r) {
+      apply(r.session);
+      setMinutesToday(r.todayMinutes);
+    }
   }, [apply]);
 
+  useEffect(() => {
+    const poll = setInterval(() => void syncFocus(), 30_000);
+    const onVis = () => { if (document.visibilityState === "visible") void syncFocus(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      clearInterval(poll);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [syncFocus]);
+
   const elapsed = session && anchor.current ? anchor.current.elapsed + (session.status === "running" ? now - anchor.current.client : 0) : 0;
+
+  const showBlockSuccess = useCallback((result: FocusBlockResult) => {
+    const id = result.session?.id;
+    if (id && completedBlockIds.current.has(id)) return;
+    if (id) completedBlockIds.current.add(id);
+    if (typeof result.todayMinutes === "number") setMinutesToday(result.todayMinutes);
+    apply(null);
+    setBlockSuccess(result.taskAutoCompleted ? "25-minute focus block complete · task completed" : "25-minute focus block complete");
+    if (successTimer.current) clearTimeout(successTimer.current);
+    successTimer.current = setTimeout(() => setBlockSuccess(null), 4_500);
+  }, [apply]);
+
+  const syncEndedBlock = useCallback(() => { void syncFocus(); }, [syncFocus]);
+  const blockCompletion = useFocusBlockCompletion(session, elapsed, showBlockSuccess, syncEndedBlock);
 
   async function act(action: "start" | "pause" | "resume" | "stop" | "discard", extra: { surge?: boolean } = {}) {
     setBusy(true);
     setError(null);
+    setBlockSuccess(null);
     try {
-      const r = await apiFetch<{ session: FocusView | null }>("/api/focus", { body: action === "start" ? { action, subjectId: subjectId || null, chapterId: core && core.subjectId === subjectId ? core.chapterId : null, kind, surge: !!extra.surge, clientRequestId: requestId() } : { action } });
-      if (action === "stop") {
-        setMinutesToday((m) => m + (r.session?.minutes ?? 0));
+      const selectedCore = core && (!core.subjectId || core.subjectId === subjectId) ? core : null;
+      const r = await apiFetch<{ session: FocusView | null; todayMinutes?: number; blockCompleted?: boolean; taskAutoCompleted?: boolean }>("/api/focus", { body: action === "start" ? {
+        action,
+        subjectId: subjectId || null,
+        chapterId: selectedCore?.chapterId ?? null,
+        taskSource: selectedCore ? "Today" : null,
+        taskId: selectedCore?.id ?? null,
+        taskTitle: selectedCore?.title ?? null,
+        kind,
+        surge: !!extra.surge,
+        clientRequestId: requestId(),
+      } : { action } });
+      if (r.blockCompleted && r.session) {
+        showBlockSuccess({ ...r, blockCompleted: true, taskAutoCompleted: !!r.taskAutoCompleted });
+        return;
+      }
+      if (action === "stop" || action === "discard") {
+        if (typeof r.todayMinutes === "number") setMinutesToday(r.todayMinutes);
+        else {
+          const priorSessionMinutes = session ? Math.floor(session.elapsedMs / 60_000) : 0;
+          setMinutesToday((m) => Math.max(0, m - priorSessionMinutes + (action === "stop" ? r.session?.minutes ?? 0 : 0)));
+        }
         apply(null);
       } else apply(r.session);
     } catch (e) {
@@ -78,11 +116,17 @@ export function TimerCard({ className, subjects, initial, initialMinutesToday, c
     }
   }
 
+  useEffect(() => () => { if (successTimer.current) clearTimeout(successTimer.current); }, []);
+
   // idle detection (F-LOG-07): no interaction for 5 min → "Still there?"; no answer in 60 s → paused (idle)
   const [idleAsk, setIdleAsk] = useState<number | null>(null);
   const lastActive = useRef(Date.now());
   useEffect(() => {
-    if (session?.status !== "running") return;
+    if (session?.status !== "running") {
+      setIdleAsk(null);
+      lastActive.current = Date.now();
+      return;
+    }
     const mark = () => {
       lastActive.current = Date.now();
     };
@@ -119,7 +163,9 @@ export function TimerCard({ className, subjects, initial, initialMinutesToday, c
 
   const running = session?.status === "running";
   const subj = subjects.find((s) => s.id === (session?.subjectId ?? subjectId));
-  const liveMinutes = minutesToday + (session ? Math.floor(elapsed / 60_000) : 0);
+  const sessionCountsToday = session?.gameDay === today;
+  const completedToday = Math.max(0, minutesToday - (sessionCountsToday ? Math.floor(session!.elapsedMs / 60_000) : 0));
+  const liveMinutes = completedToday + (sessionCountsToday ? Math.floor(elapsed / 60_000) : 0);
 
   return (
     <section className={cx("card-color relative flex min-h-[340px] flex-col overflow-hidden bg-yellow", className)} aria-label="Today's focus">
@@ -136,11 +182,18 @@ export function TimerCard({ className, subjects, initial, initialMinutesToday, c
           )}
         </div>
         {session && (
-          <Chip tone="dark" icon={running ? "bolt" : "pause"}>
-            <span className={running ? "animate-pulse-dot" : ""}>{running ? "Live" : "Paused"}</span>
-          </Chip>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Chip tone="dark">{focusKindLabel(session.kind)}</Chip>
+            <Chip tone="dark" icon={running ? "bolt" : "pause"}>
+              <span className={running ? "animate-pulse-dot" : ""}>{running ? "Live" : "Paused"}</span>
+            </Chip>
+          </div>
         )}
       </div>
+
+      {session?.taskTitle && (
+        <p className="mt-2 text-body-s font-bold opacity-80" dir="auto">Working on: {session.taskTitle}</p>
+      )}
 
       {core && (
         <ol className="mt-4 grid gap-1.5 text-body-s font-bold" aria-label="Core quest tiers">
@@ -159,7 +212,7 @@ export function TimerCard({ className, subjects, initial, initialMinutesToday, c
 
       {!session && (
         <div className="mt-5 flex flex-wrap gap-2" role="group" aria-label="Session type">
-          {KINDS.map((k) => (
+          {FOCUS_KIND_OPTIONS.map((k) => (
             <button key={k.id} type="button" onClick={() => setKind(k.id)} aria-pressed={kind === k.id} className={cx("chip border-2 border-on-color/80 py-1.5 text-body-s", kind === k.id ? "bg-on-color text-white" : "bg-transparent text-on-color hover:bg-on-color/10")}>
               {k.label}
             </button>
@@ -239,6 +292,11 @@ export function TimerCard({ className, subjects, initial, initialMinutesToday, c
         {error && (
           <p role="alert" className="mt-3 rounded-2xl bg-on-color px-4 py-2 text-body-s font-semibold text-white">
             {error}
+          </p>
+        )}
+        {(blockSuccess || blockCompletion.error) && (
+          <p role={blockSuccess ? "status" : "alert"} aria-live="polite" className={`mt-3 rounded-2xl px-4 py-2 text-body-s font-semibold text-white ${blockSuccess ? "animate-spring bg-emerald-800" : "bg-on-color"}`}>
+            {blockSuccess ?? `Retrying focus sync: ${blockCompletion.error}`}
           </p>
         )}
       </div>

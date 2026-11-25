@@ -52,6 +52,14 @@ export function focusedMinutes(s: TimerState, now: Date): number {
   return Math.floor(elapsedMs(s, now) / 60_000);
 }
 
+/** One focus block ends after 25 active minutes; paused time is already excluded from elapsedMs. */
+export const FOCUS_BLOCK_MINUTES = 25;
+export const FOCUS_BLOCK_MS = FOCUS_BLOCK_MINUTES * 60_000;
+
+export function isFocusBlockDue(status: TimerStatus, activeElapsedMs: number): boolean {
+  return status !== "ended" && activeElapsedMs >= FOCUS_BLOCK_MS;
+}
+
 /** Sessions longer than this are almost certainly a forgotten timer; the UI asks to trim. */
 export const MAX_SESSION_MINUTES = 6 * 60;
 

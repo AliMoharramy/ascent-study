@@ -12,5 +12,5 @@ export default async function FocusPage() {
   const open = (await openSession(db, userId));
   const core = (await questsForDay(db, userId, today)).find((q) => q.kind === "core");
   const target = core ? (JSON.parse(core.targetJson) as { standard: number }).standard : 45;
-  return <FocusMode initial={open ? view(open) : null} coreTitle={core?.title ?? "Free focus"} chapterId={core?.refType === "chapter" ? core.refId : null} target={target} doneToday={(await minutesForDay(db, userId, today))} />;
+  return <FocusMode initial={open ? view(open) : null} today={today} coreId={core?.id ?? null} coreTitle={core?.title ?? "Free focus"} chapterId={core?.refType === "chapter" ? core.refId : null} target={target} doneToday={(await minutesForDay(db, userId, today))} />;
 }

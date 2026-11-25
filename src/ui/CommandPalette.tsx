@@ -93,10 +93,10 @@ export function CommandPalette({ chapters, subjects }: { chapters: Chapter[]; su
 
   async function startSurge() {
     try {
-      const r = await apiFetch<{ quests: { kind: string; refId: string | null; refType: string | null }[] }>("/api/quests");
+      const r = await apiFetch<{ quests: { id: string; title: string; kind: string; refId: string | null; refType: string | null }[] }>("/api/quests");
       const core = r.quests.find((x) => x.kind === "core");
       const chapterId = core?.refType === "chapter" ? core.refId : null;
-      await apiFetch("/api/focus", { body: { action: "start", surge: true, kind: "video", chapterId, subjectId: chapterId ? chapterId.replace(/-\d+$/, "") : null, clientRequestId: requestId() } });
+      await apiFetch("/api/focus", { body: { action: "start", surge: true, kind: "video", chapterId, subjectId: chapterId ? chapterId.replace(/-\d+$/, "") : null, taskSource: core ? "Today" : null, taskId: core?.id ?? null, taskTitle: core?.title ?? null, clientRequestId: requestId() } });
       close();
       toast("Surge started — ×1.2 focus XP for the first 90 minutes");
     } catch (err) {

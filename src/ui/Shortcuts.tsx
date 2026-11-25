@@ -65,10 +65,10 @@ export function Shortcuts() {
       } else if (k === "s") {
         e.preventDefault();
         try {
-          const q = await apiFetch<{ quests: { kind: string; refId: string | null; refType: string | null }[] }>("/api/quests");
+          const q = await apiFetch<{ quests: { id: string; title: string; kind: string; refId: string | null; refType: string | null }[] }>("/api/quests");
           const core = q.quests.find((x) => x.kind === "core");
           const chapterId = core?.refType === "chapter" ? core.refId : null;
-          await apiFetch("/api/focus", { body: { action: "start", surge: true, kind: "video", chapterId, subjectId: chapterId ? chapterId.replace(/-\d+$/, "") : null, clientRequestId: requestId() } });
+          await apiFetch("/api/focus", { body: { action: "start", surge: true, kind: "video", chapterId, subjectId: chapterId ? chapterId.replace(/-\d+$/, "") : null, taskSource: core ? "Today" : null, taskId: core?.id ?? null, taskTitle: core?.title ?? null, clientRequestId: requestId() } });
           toast("Surge started — ×1.2 focus XP for the first 90 minutes");
         } catch (err) {
           toast((err as Error).message, "warn");

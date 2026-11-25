@@ -7,6 +7,8 @@ export struct TaskItem {
     source: string,
     done: bool,
     can-complete: bool,
+    selected: bool,
+    active: bool,
 }
 
 export global WidgetMotion {
@@ -158,6 +160,8 @@ component TimerCapsule inherits FocusScope {
 component TaskRow inherits Rectangle {
     in property <TaskItem> task;
     in property <bool> busy: false;
+    in property <bool> session-active: false;
+    in property <bool> session-running: false;
     callback work(string, string);
     callback finish(string, string);
 
@@ -165,8 +169,9 @@ component TaskRow inherits Rectangle {
     height: 58px;
     border-radius: 13px;
     border-width: 1px;
-    border-color: #ffffff12;
-    background: #ffffff07;
+    border-color: root.task.active ? #8ce7cdcc : (root.task.selected ? #8ce7cd66 : #ffffff12);
+    background: root.task.active ? #8ce7cd20 : (root.task.selected ? #8ce7cd14 : #ffffff07);
+    animate border-color, background { duration: WidgetMotion.animation-duration * 1ms; easing: ease-out; }
 
     Text {
         x: 12px;
@@ -184,9 +189,10 @@ component TaskRow inherits Rectangle {
         y: 30px;
         width: 198px;
         height: 16px;
-        text: root.task.detail;
-        color: #8fa1ab;
+        text: root.task.active ? (root.session-running ? "IN PROGRESS" : "PAUSED · CURRENT TASK") : root.task.detail;
+        color: root.task.active ? #8ce7cd : #8fa1ab;
         font-size: 9px;
+        font-weight: root.task.active ? 650 : 400;
         overflow: elide;
     }
 
@@ -204,9 +210,10 @@ component TaskRow inherits Rectangle {
         y: 12px;
         width: 51px;
         height: 32px;
-        label: "Work";
+        label: root.task.active ? "Active" : (root.task.selected && root.busy ? "Starting" : "Work");
         primary: true;
-        disabled: root.busy || root.task.done;
+        selected: root.task.selected;
+        disabled: root.busy || root.session-active || root.task.done;
         activated => { root.work(root.task.id, root.task.source); }
     }
 }
@@ -216,12 +223,15 @@ export component FocusWidget inherits Window {
     in-out property <bool> tasks-open: false;
     in-out property <bool> session-running: false;
     in-out property <bool> session-active: false;
+    in-out property <bool> idle-prompt-visible: false;
+    in-out property <bool> completion-visible: false;
     in-out property <bool> busy: false;
     in-out property <bool> signed-in: false;
     in-out property <bool> backdrop-supported: false;
     in-out property <bool> share-task-titles-with-ai: false;
-    in-out property <int> remaining-seconds: 1500;
-    in-out property <string> timer-text: "25:00";
+    in-out property <int> elapsed-seconds: 0;
+    in-out property <string> timer-text: "00:00";
+    in-out property <string> selected-work-kind: "video";
     in-out property <string> active-task-title: "";
     in-out property <string> status-text: "Sign in to sync your focus";
     in-out property <string> account-status: "Not connected";
@@ -231,6 +241,7 @@ export component FocusWidget inherits Window {
     in-out property <string> password: "";
     in-out property <string> task-title: "";
     in-out property <string> message: "";
+    in-out property <string> completion-text: "";
     in-out property <string> suggestion-title: "";
     in-out property <string> suggestion-reason: "";
     in-out property <string> suggestion-minutes: "25 min";
@@ -244,6 +255,8 @@ export component FocusWidget inherits Window {
     callback toggle-focus();
     callback finish-focus();
     callback tick();
+    callback check-idle();
+    callback confirm-active();
     callback reconcile-focus();
     callback login();
     callback logout();
@@ -256,6 +269,7 @@ export component FocusWidget inherits Window {
     callback work-suggestion();
     callback set-title-sharing(bool);
     callback change-source(string);
+    callback select-work-kind(string);
     callback move-window();
 
     title: "Ascent Focus";
@@ -263,7 +277,7 @@ export component FocusWidget inherits Window {
     always-on-top: true;
     background: transparent;
     width: root.panel-open ? 374px : (root.active-task-title == "" ? 104px : 218px);
-    height: root.panel-open ? (root.tasks-open ? 752px : 286px) : 44px;
+    height: root.panel-open ? (root.tasks-open ? 752px : 334px) : 44px;
     animate width, height { duration: WidgetMotion.animation-duration * 1ms; easing: ease-out; }
 
     Timer {
@@ -271,11 +285,21 @@ export component FocusWidget inherits Window {
         running: root.session-running;
         triggered => { root.tick(); }
     }
+    Timer {
+        interval: 5s;
+        running: root.session-running;
+        triggered => { root.check-idle(); }
+    }
 
     Timer {
         interval: 30s;
         running: root.signed-in;
         triggered => { root.reconcile-focus(); }
+    }
+    Timer {
+        interval: 3s;
+        running: root.completion-visible;
+        triggered => { root.completion-visible = false; root.completion-text = ""; }
     }
 
     if !root.panel-open: TimerCapsule {
@@ -373,68 +397,108 @@ export component FocusWidget inherits Window {
             x: 16px;
             y: 60px;
             width: parent.width - 32px;
-            height: 137px;
+            height: 199px;
             border-radius: 18px;
             border-width: 1px;
-            border-color: #9fe6d126;
-            background: #8ce7cd12;
+            border-color: root.session-running ? #8ce7cd52 : #ffffff20;
+            background: root.session-running ? #8ce7cd0c : #ffffff08;
+            animate border-color, background { duration: WidgetMotion.animation-duration * 1ms; easing: ease-out; }
 
+            Text {
+                x: 14px;
+                y: 11px;
+                width: 116px;
+                height: 12px;
+                text: "FOCUS TIMER";
+                color: #a8b9bf;
+                font-size: 9px;
+                font-weight: 700;
+                letter-spacing: 0.8px;
+            }
             Rectangle {
-                x: 15px;
-                y: 21px;
-                width: 86px;
-                height: 86px;
-                border-radius: 44px;
-                border-width: 3px;
-                border-color: root.session-running ? #8ce7cdcc : #8ce7cd66;
-                background: #18252c;
-                animate border-color { duration: WidgetMotion.animation-duration * 1ms; easing: ease-out; }
+                x: parent.width - 88px;
+                y: 8px;
+                width: 74px;
+                height: 20px;
+                border-radius: 10px;
+                border-width: 1px;
+                border-color: root.session-running ? #8ce7cd66 : (root.session-active ? #e9c87955 : #ffffff22);
+                background: root.session-running ? #8ce7cd18 : (root.session-active ? #e9c87914 : #ffffff08);
+                animate border-color, background { duration: WidgetMotion.animation-duration * 1ms; easing: ease-out; }
                 Text {
-                    text: "◷";
-                    color: #b6f3df;
-                    font-size: 28px;
+                    text: root.session-running ? "FOCUSING" : (root.session-active ? "PAUSED" : (root.signed-in ? "READY" : "SIGN IN"));
+                    color: root.session-running ? #8ce7cd : (root.session-active ? #e9c879 : #bdcbd0);
+                    font-size: 8px;
+                    font-weight: 700;
+                    letter-spacing: 0.4px;
                     horizontal-alignment: center;
                     vertical-alignment: center;
                     width: parent.width;
                     height: parent.height;
                 }
+                Tooltip {
+                    Text {
+                        text: root.status-text;
+                    }
+                }
             }
             Text {
-                x: 117px;
-                y: 16px;
-                width: parent.width - 130px;
-                text: root.status-text;
-                color: #a9d4c9;
-                font-size: 10px;
-                font-weight: 600;
-                overflow: elide;
-            }
-            Text {
-                x: 117px;
-                y: 37px;
-                width: parent.width - 130px;
+                x: 14px;
+                y: 35px;
+                width: parent.width - 28px;
+                height: 46px;
                 text: root.timer-text;
                 color: #f2f7f6;
-                font-size: 30px;
-                font-weight: 540;
-                font-family: "Segoe UI";
+                font-size: 43px;
+                font-weight: 650;
+                font-family: "Consolas";
+                horizontal-alignment: center;
+                vertical-alignment: center;
             }
-            Text {
-                x: 117px;
-                y: 75px;
-                width: parent.width - 130px;
-                height: 23px;
-                text: root.active-task-title != "" ? root.active-task-title : (root.session-active ? "Synced with your Ascent account" : "A 25-minute focus block");
-                color: #9aaab5;
-                font-size: 9px;
-                wrap: word-wrap;
-                overflow: elide;
+            Rectangle {
+                x: 12px;
+                y: 88px;
+                width: parent.width - 24px;
+                height: 24px;
+                border-radius: 9px;
+                border-width: 1px;
+                border-color: root.active-task-title != "" ? #8ce7cd30 : #ffffff10;
+                background: root.active-task-title != "" ? #8ce7cd0b : #ffffff05;
+                Text {
+                    x: 9px;
+                    y: 0px;
+                    width: 69px;
+                    height: parent.height;
+                    text: root.active-task-title != "" ? "WORKING ON" : "NEXT TASK";
+                    color: #93aaa8;
+                    font-size: 8px;
+                    font-weight: 700;
+                    letter-spacing: 0.35px;
+                    vertical-alignment: center;
+                }
+                Text {
+                    x: 80px;
+                    y: 0px;
+                    width: parent.width - 89px;
+                    height: parent.height;
+                    text: root.active-task-title != "" ? root.active-task-title : (root.session-active ? "Free focus session" : "Choose a task below");
+                    color: root.active-task-title != "" ? #d7eee7 : #b2c0c6;
+                    font-size: 10px;
+                    font-weight: 600;
+                    overflow: elide;
+                    vertical-alignment: center;
+                    Tooltip {
+                        Text {
+                            text: root.active-task-title;
+                        }
+                    }
+                }
             }
             ActionButton {
-                x: 117px;
-                y: 101px;
-                width: 103px;
-                height: 30px;
+                x: 14px;
+                y: 119px;
+                width: root.session-active ? (parent.width - 36px) / 2 : parent.width - 28px;
+                height: 29px;
                 label: !root.signed-in ? "Sign in" : (root.session-running ? "Pause" : (root.session-active ? "Resume" : "Start focus"));
                 primary: true;
                 disabled: root.busy;
@@ -443,22 +507,79 @@ export component FocusWidget inherits Window {
                     else { root.tasks-open = true; }
                 }
             }
-            ActionButton {
-                x: 226px;
-                y: 101px;
-                width: 86px;
-                height: 30px;
+            if root.session-active: ActionButton {
+                x: 14px + (parent.width - 36px) / 2 + 8px;
+                y: 119px;
+                width: (parent.width - 36px) / 2;
+                height: 29px;
                 label: "Finish";
-                disabled: root.busy || !root.session-active;
+                disabled: root.busy;
                 activated => { root.finish-focus(); }
             }
+            if root.completion-visible: Rectangle {
+                x: 12px;
+                y: 158px;
+                width: parent.width - 24px;
+                height: 25px;
+                border-radius: 9px;
+                border-width: 1px;
+                border-color: #8ce7cd50;
+                background: #8ce7cd14;
+                Text {
+                    text: root.completion-text;
+                    color: #a3f2d4;
+                    font-size: 9px;
+                    font-weight: 650;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    width: parent.width - 12px;
+                    height: parent.height;
+                    overflow: elide;
+                }
+            }
+            if root.idle-prompt-visible && !root.completion-visible: Text {
+                x: 12px;
+                y: 162px;
+                width: 210px;
+                height: 30px;
+                text: "Still studying? The timer pauses in a minute.";
+                color: #f0d8a0;
+                font-size: 9px;
+                wrap: word-wrap;
+            }
+            if root.idle-prompt-visible && !root.completion-visible: ActionButton {
+                x: 236px;
+                y: 162px;
+                width: 88px;
+                height: 28px;
+                label: "I'm here";
+                primary: true;
+                activated => { root.confirm-active(); }
+            }
+            if !root.idle-prompt-visible: Text {
+                x: 14px;
+                y: 155px;
+                width: parent.width - 28px;
+                height: 10px;
+                text: "SESSION TYPE";
+                color: #8fa5a3;
+                font-size: 8px;
+                font-weight: 650;
+                letter-spacing: 0.6px;
+            }
+            if !root.idle-prompt-visible: ActionButton { x: 12px; y: 172px; width: 48px; height: 21px; label: "Video"; selected: root.selected-work-kind == "video"; primary: root.selected-work-kind == "video"; disabled: root.busy || root.session-active; activated => { root.select-work-kind("video"); } }
+            if !root.idle-prompt-visible: ActionButton { x: 66px; y: 172px; width: 48px; height: 21px; label: "Tests"; selected: root.selected-work-kind == "tests"; primary: root.selected-work-kind == "tests"; disabled: root.busy || root.session-active; activated => { root.select-work-kind("tests"); } }
+            if !root.idle-prompt-visible: ActionButton { x: 120px; y: 172px; width: 48px; height: 21px; label: "Review"; selected: root.selected-work-kind == "review"; primary: root.selected-work-kind == "review"; disabled: root.busy || root.session-active; activated => { root.select-work-kind("review"); } }
+            if !root.idle-prompt-visible: ActionButton { x: 174px; y: 172px; width: 48px; height: 21px; label: "Analysis"; selected: root.selected-work-kind == "analysis"; primary: root.selected-work-kind == "analysis"; disabled: root.busy || root.session-active; activated => { root.select-work-kind("analysis"); } }
+            if !root.idle-prompt-visible: ActionButton { x: 228px; y: 172px; width: 48px; height: 21px; label: "Forge"; selected: root.selected-work-kind == "forge"; primary: root.selected-work-kind == "forge"; disabled: root.busy || root.session-active; activated => { root.select-work-kind("forge"); } }
+            if !root.idle-prompt-visible: ActionButton { x: 282px; y: 172px; width: 48px; height: 21px; label: "Other"; selected: root.selected-work-kind == "other"; primary: root.selected-work-kind == "other"; disabled: root.busy || root.session-active; activated => { root.select-work-kind("other"); } }
         }
 
         ActionButton {
             x: 16px;
-            y: 207px;
+            y: 269px;
             width: parent.width - 32px;
-            height: 49px;
+            height: 40px;
             label: root.tasks-open ? "Hide tasks     ↑" : "Open task list     ↓";
             selected: root.tasks-open;
             disabled: root.busy;
@@ -474,9 +595,9 @@ export component FocusWidget inherits Window {
 
         if root.tasks-open: Rectangle {
             x: 16px;
-            y: 266px;
+            y: 319px;
             width: parent.width - 32px;
-            height: parent.height - 282px;
+            height: parent.height - 335px;
             border-radius: 17px;
             border-width: 1px;
             border-color: #ffffff18;
@@ -598,19 +719,19 @@ export component FocusWidget inherits Window {
                     activated => { root.refresh(); }
                 }
                 ActionButton {
-                    x: 12px; y: 37px; width: 106px; height: 33px;
+                    x: 12px; y: 37px; width: (parent.width - 40px) / 3; height: 33px;
                     label: "Today"; selected: root.selected-source == "Today";
                     disabled: root.busy;
                     activated => { root.selected-source = "Today"; root.change-source("Today"); }
                 }
                 ActionButton {
-                    x: 124px; y: 37px; width: 106px; height: 33px;
+                    x: 12px + (parent.width - 40px) / 3 + 8px; y: 37px; width: (parent.width - 40px) / 3; height: 33px;
                     label: "Courses"; selected: root.selected-source == "Courses";
                     disabled: root.busy;
                     activated => { root.selected-source = "Courses"; root.change-source("Courses"); }
                 }
                 ActionButton {
-                    x: 236px; y: 37px; width: 106px; height: 33px;
+                    x: parent.width - 12px - (parent.width - 40px) / 3; y: 37px; width: (parent.width - 40px) / 3; height: 33px;
                     label: "Mine"; selected: root.selected-source == "Mine";
                     disabled: root.busy;
                     activated => { root.selected-source = "Mine"; root.change-source("Mine"); }
@@ -712,6 +833,8 @@ export component FocusWidget inherits Window {
                         width: parent.width;
                         task: task;
                         busy: root.busy;
+                        session-active: root.session-active;
+                        session-running: root.session-running;
                         work(id, source) => { root.start-task(id, source); }
                         finish(id, source) => { root.complete-task(id, source); }
                     }

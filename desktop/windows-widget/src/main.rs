@@ -6,21 +6,24 @@ mod settings;
 
 slint::include_modules!();
 
-use api::{ApiClient, ApiError, FocusSession, TaskSource, WidgetTask};
+use api::{ApiClient, ApiError, FocusActionResult, FocusSession, TaskSource, WidgetTask};
 use credentials::SessionCredential;
 use slint::{ModelRc, VecModel};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Duration, Instant};
 use uuid::Uuid;
-
-const FOCUS_LENGTH_SECONDS: i32 = 25 * 60;
+use windows_sys::Win32::System::SystemInformation::GetTickCount;
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
 
 #[derive(Default)]
 struct AppState {
     server_url: String,
     credential: Option<SessionCredential>,
     focus: Option<FocusSession>,
+    idle_prompt_started: Option<Instant>,
+    selected_task: Option<WidgetTask>,
     tasks: Vec<WidgetTask>,
     pending_task_creation: Option<PendingTaskCreation>,
     pending_task_completions: HashMap<String, String>,
@@ -42,36 +45,76 @@ type SharedState = Arc<Mutex<AppState>>;
 
 fn format_time(total_seconds: i32) -> String {
     let safe = total_seconds.max(0);
-    format!("{:02}:{:02}", safe / 60, safe % 60)
+    let hours = safe / 3600;
+    let minutes = (safe % 3600) / 60;
+    let seconds = safe % 60;
+    if hours > 0 {
+        format!("{hours}:{minutes:02}:{seconds:02}")
+    } else {
+        format!("{minutes:02}:{seconds:02}")
+    }
 }
 
-fn session_remaining(session: &FocusSession) -> i32 {
-    (FOCUS_LENGTH_SECONDS - (session.elapsed_ms.max(0) / 1000) as i32).max(0)
+fn session_elapsed_seconds(session: &FocusSession) -> i32 {
+    (session.elapsed_ms.max(0) / 1000) as i32
+}
+
+fn system_idle_duration() -> Option<Duration> {
+    let mut input = LASTINPUTINFO {
+        cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32,
+        dwTime: 0,
+    };
+    if unsafe { GetLastInputInfo(&mut input) } == 0 {
+        return None;
+    }
+    let now = unsafe { GetTickCount() };
+    Some(Duration::from_millis(now.wrapping_sub(input.dwTime) as u64))
 }
 
 fn apply_focus(ui: &FocusWidget, state: &SharedState, session: Option<FocusSession>) {
-    let remaining = session
-        .as_ref()
-        .map(session_remaining)
-        .unwrap_or(FOCUS_LENGTH_SECONDS);
+    let elapsed = session.as_ref().map(session_elapsed_seconds).unwrap_or(0);
     let running = session
         .as_ref()
         .is_some_and(|current| current.status == "running");
     let status = match session.as_ref() {
-        Some(current) if current.status == "running" && remaining == 0 => {
-            "Block elapsed · session still active"
+        Some(current) if current.status == "running" => {
+            format!("{} · focus active", kind_label(&current.kind))
         }
-        Some(current) if current.status == "running" => "Focus session active",
-        Some(_) => "Paused · synced with Ascent",
-        None => "Ready for a focus block",
+        Some(current) => format!(
+            "{} · paused · synced with Ascent",
+            kind_label(&current.kind)
+        ),
+        None => "Ready for a focus block".to_string(),
     };
     if let Ok(mut shared) = state.lock() {
+        if !running {
+            shared.idle_prompt_started = None;
+        }
+        if let Some(current) = session.as_ref() {
+            if current.task_id.is_none() {
+                shared.selected_task = None;
+            } else if let Some(task) = shared.tasks.iter().find(|task| {
+                Some(task.id.as_str()) == current.task_id.as_deref()
+                    && Some(task.source.label()) == current.task_source.as_deref()
+            }) {
+                shared.selected_task = Some(task.clone());
+            }
+        } else {
+            shared.selected_task = None;
+        }
         shared.focus = session.clone();
     }
     ui.set_session_active(session.is_some());
     ui.set_session_running(running);
-    ui.set_remaining_seconds(remaining);
-    ui.set_timer_text(format_time(remaining).into());
+    ui.set_idle_prompt_visible(
+        running
+            && state
+                .lock()
+                .map(|shared| shared.idle_prompt_started.is_some())
+                .unwrap_or(false),
+    );
+    ui.set_elapsed_seconds(elapsed);
+    ui.set_timer_text(format_time(elapsed).into());
     ui.set_status_text(status.into());
     ui.set_active_task_title(
         session
@@ -80,12 +123,26 @@ fn apply_focus(ui: &FocusWidget, state: &SharedState, session: Option<FocusSessi
             .unwrap_or_default()
             .into(),
     );
+    if let Some(current) = session.as_ref() {
+        ui.set_selected_work_kind(current.kind.clone().into());
+    }
+    set_task_model(ui, state, &ui.get_selected_source());
 }
 
 fn set_task_model(ui: &FocusWidget, state: &SharedState, source: &str) {
     let tasks = state
         .lock()
         .map(|state| {
+            let active_key = state
+                .focus
+                .as_ref()
+                .and_then(|focus| focus.task_source.clone().zip(focus.task_id.clone()));
+            let selected_key = active_key.clone().or_else(|| {
+                state
+                    .selected_task
+                    .as_ref()
+                    .map(|task| (task.source.label().to_string(), task.id.clone()))
+            });
             state
                 .tasks
                 .iter()
@@ -97,6 +154,16 @@ fn set_task_model(ui: &FocusWidget, state: &SharedState, source: &str) {
                     source: task.source.label().into(),
                     done: task.done,
                     can_complete: task.can_complete,
+                    active: active_key
+                        .as_ref()
+                        .is_some_and(|(active_source, active_id)| {
+                            active_source == task.source.label() && active_id == &task.id
+                        }),
+                    selected: selected_key.as_ref().is_some_and(
+                        |(selected_source, selected_id)| {
+                            selected_source == task.source.label() && selected_id == &task.id
+                        },
+                    ),
                 })
                 .collect::<Vec<_>>()
         })
@@ -104,6 +171,17 @@ fn set_task_model(ui: &FocusWidget, state: &SharedState, source: &str) {
     ui.set_has_tasks(!tasks.is_empty());
     ui.set_task_content_height((tasks.len().min(i32::MAX as usize / 63) * 63) as i32);
     ui.set_tasks(ModelRc::new(VecModel::from(tasks)));
+}
+
+fn kind_label(kind: &str) -> &str {
+    match kind {
+        "video" => "Video",
+        "tests" => "Tests",
+        "review" => "Review",
+        "analysis" => "Analysis",
+        "forge" => "Forge",
+        _ => "Other",
+    }
 }
 
 fn auth_error(ui: &FocusWidget, state: &SharedState, error: &ApiError) {
@@ -244,6 +322,7 @@ fn start_focus_action(
     state: SharedState,
     action: String,
     task: Option<WidgetTask>,
+    fallback_kind: String,
 ) {
     let refresh_tasks_after = action == "stop";
     let (server_url, credential) = snapshot(&state);
@@ -253,14 +332,20 @@ fn start_focus_action(
             unauthorized: false,
         });
         let result = result.and_then(|client| {
-            match client.focus_action(&action, task.as_ref()) {
-                Ok(session) => Ok((session, None)),
+            match client.focus_action(&action, task.as_ref(), &fallback_kind) {
+                Ok(response) => Ok((response, None)),
                 Err(error) => {
                     // A lost response can happen after the server committed the transition.
                     // Read the server state before presenting the action as unsaved.
                     let reconciled = client.focus();
                     match reconciled {
-                        Ok(session) => Ok((session, Some(error))),
+                        Ok(session) => Ok((
+                            FocusActionResult {
+                                session,
+                                ..FocusActionResult::default()
+                            },
+                            Some(error),
+                        )),
                         Err(sync_error) if sync_error.unauthorized => Err(sync_error),
                         Err(_) => Err(error),
                     }
@@ -272,9 +357,12 @@ fn start_focus_action(
                 return;
             };
             match result {
-                Ok((session, warning)) => {
-                    apply_focus(&ui, &state, session);
-                    if refresh_tasks_after {
+                Ok((response, warning)) => {
+                    apply_focus(&ui, &state, response.session);
+                    if response.block_completed {
+                        show_focus_completion(&ui, response.task_auto_completed);
+                    }
+                    if refresh_tasks_after || response.block_completed {
                         ui.set_busy(true);
                         ui.set_message("Refreshing tasks after the focus session…".into());
                         refresh_from_server(ui.as_weak(), state.clone(), true);
@@ -292,6 +380,69 @@ fn start_focus_action(
                                 .into(),
                         );
                     }
+                }
+                Err(error) => auth_error(&ui, &state, &error),
+            }
+        });
+    });
+}
+
+fn show_focus_completion(ui: &FocusWidget, task_completed: bool) {
+    ui.set_completion_text(
+        if task_completed {
+            "25-minute block complete · task completed"
+        } else {
+            "25-minute focus block complete"
+        }
+        .into(),
+    );
+    ui.set_completion_visible(true);
+}
+
+fn complete_focus_block_action(
+    weak: slint::Weak<FocusWidget>,
+    state: SharedState,
+    session_id: String,
+) {
+    let (server_url, credential) = snapshot(&state);
+    thread::spawn(move || {
+        let result = ApiClient::new(&server_url, credential)
+            .map_err(|message| ApiError {
+                message,
+                unauthorized: false,
+            })
+            .and_then(|client| match client.complete_focus_block(&session_id) {
+                Ok(response) => Ok(response),
+                Err(error) => match client.complete_focus_block(&session_id) {
+                    Ok(response) => Ok(response),
+                    Err(sync_error) if sync_error.unauthorized => Err(sync_error),
+                    Err(_) => match client.focus() {
+                        Ok(session) => Ok(FocusActionResult {
+                            session,
+                            ..FocusActionResult::default()
+                        }),
+                        Err(sync_error) if sync_error.unauthorized => Err(sync_error),
+                        Err(_) => Err(error),
+                    },
+                },
+            });
+
+        let _ = slint::invoke_from_event_loop(move || {
+            let Some(ui) = weak.upgrade() else {
+                return;
+            };
+            match result {
+                Ok(response) if response.block_completed => {
+                    apply_focus(&ui, &state, None);
+                    show_focus_completion(&ui, response.task_auto_completed);
+                    ui.set_busy(true);
+                    ui.set_message("Refreshing tasks after the focus session…".into());
+                    refresh_from_server(ui.as_weak(), state.clone(), true);
+                }
+                Ok(response) => {
+                    apply_focus(&ui, &state, response.session);
+                    ui.set_busy(false);
+                    ui.set_message("".into());
                 }
                 Err(error) => auth_error(&ui, &state, &error),
             }
@@ -639,7 +790,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             ui.set_busy(true);
             ui.set_message("Saving focus state to Ascent…".into());
-            start_focus_action(weak.clone(), state.clone(), action.into(), None);
+            start_focus_action(
+                weak.clone(),
+                state.clone(),
+                action.into(),
+                None,
+                ui.get_selected_work_kind().to_string(),
+            );
         }
     });
 
@@ -656,22 +813,98 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             ui.set_busy(true);
             ui.set_message("Finishing focus session…".into());
-            start_focus_action(weak.clone(), state.clone(), "stop".into(), None);
+            start_focus_action(
+                weak.clone(),
+                state.clone(),
+                "stop".into(),
+                None,
+                ui.get_selected_work_kind().to_string(),
+            );
         }
     });
 
     let weak = ui.as_weak();
-    ui.on_tick(move || {
-        let Some(ui) = weak.upgrade() else {
-            return;
-        };
-        let remaining = ui.get_remaining_seconds();
-        if remaining > 0 {
-            let next = remaining - 1;
-            ui.set_remaining_seconds(next);
+    ui.on_tick({
+        let state = state.clone();
+        let weak = weak.clone();
+        move || {
+            let Some(ui) = weak.upgrade() else {
+                return;
+            };
+            let elapsed = ui.get_elapsed_seconds();
+            let next = elapsed.saturating_add(1).min(25 * 60);
+            ui.set_elapsed_seconds(next);
             ui.set_timer_text(format_time(next).into());
-            if next == 0 {
-                ui.set_status_text("Block elapsed · session still active".into());
+            if next >= 25 * 60 && ui.get_session_active() && !ui.get_busy() {
+                let session = state.lock().ok().and_then(|shared| shared.focus.clone());
+                if let Some(session) = session {
+                    ui.set_busy(true);
+                    ui.set_message("Completing the 25-minute focus block…".into());
+                    complete_focus_block_action(weak.clone(), state.clone(), session.id);
+                }
+            }
+        }
+    });
+
+    let weak = ui.as_weak();
+    ui.on_check_idle({
+        let state = state.clone();
+        let weak = weak.clone();
+        move || {
+            let Some(ui) = weak.upgrade() else {
+                return;
+            };
+            if !ui.get_session_running() || ui.get_busy() {
+                return;
+            }
+            let inactivity = system_idle_duration().unwrap_or_default();
+            let mut show_prompt = false;
+            let mut pause_session = false;
+            if let Ok(mut shared) = state.lock() {
+                match shared.idle_prompt_started {
+                    Some(prompted_at) if prompted_at.elapsed() >= Duration::from_secs(60) => {
+                        shared.idle_prompt_started = None;
+                        pause_session = true;
+                    }
+                    Some(_) => {}
+                    None if inactivity >= Duration::from_secs(5 * 60) => {
+                        shared.idle_prompt_started = Some(Instant::now());
+                        show_prompt = true;
+                    }
+                    None => {}
+                }
+            }
+            if show_prompt {
+                ui.set_idle_prompt_visible(true);
+                ui.set_panel_open(true);
+                ui.set_tasks_open(false);
+            }
+            if pause_session {
+                ui.set_idle_prompt_visible(false);
+                ui.set_busy(true);
+                ui.set_message("Pausing after inactivity…".into());
+                start_focus_action(
+                    weak.clone(),
+                    state.clone(),
+                    "idle".into(),
+                    None,
+                    ui.get_selected_work_kind().to_string(),
+                );
+            }
+        }
+    });
+
+    let weak = ui.as_weak();
+    ui.on_confirm_active({
+        let state = state.clone();
+        let weak = weak.clone();
+        move || {
+            if let Ok(mut shared) = state.lock() {
+                shared.idle_prompt_started = None;
+            }
+            if let Some(ui) = weak.upgrade() {
+                ui.set_idle_prompt_visible(false);
+                ui.set_message("Focus timer continues.".into());
             }
         }
     });
@@ -719,6 +952,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let weak = ui.as_weak();
+    ui.on_select_work_kind({
+        let weak = weak.clone();
+        move |kind| {
+            if let Some(ui) = weak.upgrade() {
+                if !ui.get_busy() && !ui.get_session_active() {
+                    ui.set_selected_work_kind(kind.clone());
+                    ui.set_message(
+                        format!("Next focus type: {}", kind_label(&kind.to_string())).into(),
+                    );
+                }
+            }
+        }
+    });
+
+    let weak = ui.as_weak();
     ui.on_start_task({
         let state = state.clone();
         let weak = weak.clone();
@@ -748,9 +996,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ui.set_message("That task is no longer available. Refresh and try again.".into());
                 return;
             };
+            if let Ok(mut shared) = state.lock() {
+                shared.selected_task = Some(task.clone());
+            }
+            ui.set_active_task_title(task.title.clone().into());
+            set_task_model(&ui, &state, &ui.get_selected_source());
             ui.set_busy(true);
             ui.set_message(format!("Starting focus for {}…", task.title).into());
-            start_focus_action(weak.clone(), state.clone(), "start".into(), Some(task));
+            start_focus_action(
+                weak.clone(),
+                state.clone(),
+                "start".into(),
+                Some(task),
+                ui.get_selected_work_kind().to_string(),
+            );
         }
     });
 
@@ -947,7 +1206,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 title: ui.get_suggestion_title().to_string(),
                 detail: ui.get_suggestion_minutes().to_string(),
                 source: TaskSource::Ai,
-                focus_kind: "other".into(),
                 subject_id: String::new(),
                 chapter_id: String::new(),
                 done: false,
@@ -955,7 +1213,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             ui.set_busy(true);
             ui.set_message("Starting a focus block for this suggestion…".into());
-            start_focus_action(weak.clone(), state.clone(), "start".into(), Some(task));
+            if let Ok(mut shared) = state.lock() {
+                shared.selected_task = Some(task.clone());
+            }
+            ui.set_active_task_title(task.title.clone().into());
+            start_focus_action(
+                weak.clone(),
+                state.clone(),
+                "start".into(),
+                Some(task),
+                ui.get_selected_work_kind().to_string(),
+            );
         }
     });
 
