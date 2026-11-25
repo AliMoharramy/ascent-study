@@ -3,7 +3,7 @@ import { z } from "zod";
 import { withUserTransaction, queryOne, type Db } from "@/db/client";
 import { chapters, courses, lessonChapters, lessons, type LessonStatus } from "@/db/schema";
 import { parseLessonList, type ParseResult } from "@/domain/lessonParse";
-import { appendEvent } from "@/events/store";
+import { appendEvent, replayOf } from "@/events/store";
 import { newId, nowIso } from "@/lib/ids";
 
 /** Courses & lessons (T-R1-02 / F-DATA-02/03/04): CRUD, paste/CSV import with preview, watch status. */
@@ -102,12 +102,19 @@ export async function importLessons(db: Db, userId: string, courseId: string, te
 });
 }
 
-export async function setLessonStatus(db: Db, userId: string, lessonId: string, status: LessonStatus) {
+export async function setLessonStatus(db: Db, userId: string, lessonId: string, status: LessonStatus, clientRequestId?: string) {
   await withUserTransaction(db, userId, async (tx) => {
+    const request = { lessonId, status };
+    if (clientRequestId && await replayOf(tx, userId, "lesson.status_changed", clientRequestId, request)) return;
     const l = (await tx.select().from(lessons).where(eq(lessons.id, lessonId)).limit(1))[0];
     if (!l) throw new Error("Lesson not found");
     await tx.update(lessons).set({ status, watchedAt: status === "done" ? nowIso() : null, updatedAt: nowIso() }).where(eq(lessons.id, lessonId));
-    await appendEvent(tx, { userId, type: "lesson.status_changed", payload: { lessonId, courseId: l.courseId, from: l.status, to: status } });
+    await appendEvent(tx, {
+      userId,
+      type: "lesson.status_changed",
+      payload: { lessonId, courseId: l.courseId, from: l.status, to: status, ...(clientRequestId ? { request } : {}) },
+      clientRequestId,
+    });
   });
 }
 

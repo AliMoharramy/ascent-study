@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, type TestDb } from "@/db/testing";
 import { quests } from "@/db/schema";
+import { listEvents } from "@/events/store";
 import { createUser } from "./auth";
 import { QuestActionDenied, setQuestTier } from "./quests";
 
@@ -36,8 +37,13 @@ describe("manual quest actions", () => {
     expect(await fixture.db.select().from(quests)).toMatchObject([{ id: "tracked-minutes", tierDone: null }]);
 
     await insertQuest("manual-check", "check");
-    await setQuestTier(fixture.db, userId, "manual-check", "standard");
+    const input = { questId: "manual-check", tier: "standard" as const };
+    await setQuestTier(fixture.db, userId, input.questId, input.tier, "manual-check-done");
+    await setQuestTier(fixture.db, userId, input.questId, input.tier, "manual-check-done");
     const tiers = new Map((await fixture.db.select({ id: quests.id, tierDone: quests.tierDone }).from(quests)).map((row) => [row.id, row.tierDone]));
     expect(tiers).toEqual(new Map([["manual-check", "standard"], ["tracked-minutes", null]]));
+    expect(await listEvents(fixture.db, userId, "quest.progress")).toMatchObject([
+      { clientRequestId: "manual-check-done", payload: { request: input } },
+    ]);
   });
 });

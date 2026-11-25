@@ -203,7 +203,10 @@ describe("courses & lessons (T-R1-02)", () => {
         expect(c.course.sessions).toBe(100);
         expect(c.course.durationMin).toBe(3000);
         expect(c.course.estimated).toBe(false);
-        (await setLessonStatus(db, userId, c.lessons[0]!.id, "done"));
+        const lessonRequestId = "lesson-done-once";
+        (await setLessonStatus(db, userId, c.lessons[0]!.id, "done", lessonRequestId));
+        (await setLessonStatus(db, userId, c.lessons[0]!.id, "done", lessonRequestId));
+        expect((await listEvents(db, userId, "lesson.status_changed")).filter((event) => event.payload.lessonId === c.lessons[0]!.id)).toHaveLength(1);
         (await setLessonStatus(db, userId, c.lessons[1]!.id, "watching"));
         expect((await setLessonChapters(db, userId, c.lessons[0]!.id, ["dsa-4", "dsa-5", "nope-1"]))).toEqual(["dsa-4", "dsa-5"]);
         const listed = (await listCourses(db, "dsa")).find((x) => x.id === id)!;

@@ -1,7 +1,7 @@
 import { and, desc, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { withUserTransaction, type Db } from "@/db/client";
-import { courses, focusSessions, habitLogs, lessons, personalTasks, quests, type FocusKind } from "@/db/schema";
+import { courses, focusSessions, lessons, personalTasks, quests, type FocusKind } from "@/db/schema";
 import { FOCUS_KINDS } from "@/domain/focus";
 export { FOCUS_KINDS };
 import { elapsedMs, FOCUS_BLOCK_MINUTES, FOCUS_BLOCK_MS, focusedMinutes, isFocusBlockDue, pauseTimer, resumeTimer, startTimer, stopTimer, TimerError, type TimerState } from "@/domain/timer";
@@ -89,7 +89,7 @@ async function completeSelectedFocusTask(tx: Db, userId: string, session: Row): 
       .where(and(eq(lessons.id, session.taskId), eq(courses.userId, userId)))
       .limit(1))[0];
     if (!lesson || lesson.status === "done") return false;
-    await setLessonStatus(tx, userId, lesson.id, "done");
+    await setLessonStatus(tx, userId, lesson.id, "done", `focus-task-${session.id}`);
     return true;
   }
 
@@ -116,18 +116,10 @@ async function completeSelectedFocusTask(tx: Db, userId: string, session: Row): 
     } catch {
       return false;
     }
-    if (!quest.habitId && metric !== "check") return false;
-
-    if (quest.habitId) {
-      const existingLog = (await tx.select({ tierDone: habitLogs.tierDone })
-        .from(habitLogs)
-        .where(and(eq(habitLogs.habitId, quest.habitId), eq(habitLogs.userId, userId), eq(habitLogs.date, quest.date)))
-        .limit(1))[0];
-      if (existingLog?.tierDone === "standard" || existingLog?.tierDone === "stretch") return false;
-    }
+    if (quest.habitId || metric !== "check") return false;
 
     if (quest.tierDone === "standard" || quest.tierDone === "stretch") return false;
-    await setQuestTier(tx, userId, quest.id, "standard");
+    await setQuestTier(tx, userId, quest.id, "standard", `focus-task-${session.id}`);
     return true;
   }
 

@@ -6,7 +6,7 @@ import { capWeeklyContract, contractAmount, habitScheduled } from "@/domain/pill
 import type { GameConfig } from "@/config/schema";
 import { advanceStreak, closeDay as closeDayDomain, comebackQuest, comebackSettlement, emptyStreak, lifeEventAllowed, rollLoot, selectDailyQuests, threeTier, tierRank, tierReached, type QuestSpec, type QuestTarget, type QuestTier } from "@/domain/quests";
 import { todayCore } from "@/domain/planner";
-import { appendEvent } from "@/events/store";
+import { appendEvent, replayOf } from "@/events/store";
 import { activeConfig } from "@/events/projections";
 import { addDaysIso, diffDaysIso, weekStartSaturday } from "@/i18n/jalali";
 import { PROJECT_START, weekNoOf, WEEK1_START } from "@/lib/campaign";
@@ -184,7 +184,7 @@ export async function refreshProgress(db: Db, userId: string, day: string) {
 }
 
 /** Manual tick for check-type quests without a habit (Nightly Review). */
-export async function setQuestTier(db: Db, userId: string, questId: string, tier: QuestTier | null) {
+export async function setQuestTier(db: Db, userId: string, questId: string, tier: QuestTier | null, clientRequestId?: string) {
   return await withUserTransaction(db, userId, async (tx) => {
   const q = (await tx.select().from(quests).where(and(eq(quests.id, questId), eq(quests.userId, userId))).limit(1))[0];
   if (!q) throw new Error("Unknown quest");
@@ -199,18 +199,33 @@ export async function setQuestTier(db: Db, userId: string, questId: string, tier
       throw new QuestActionDenied("This quest is completed from its tracked study activity");
     }
   }
+  const request = { questId, tier };
+  const eventType = q.habitId ? "habit.logged" : "quest.progress";
+  if (clientRequestId && await replayOf(tx, userId, eventType, clientRequestId, request)) return [{ id: questId, tier }];
   if (q.habitId) {
     // pillar quests are habits: log the habit (XP is projected from habit.logged)
     const h = (await tx.select().from(habits).where(eq(habits.id, q.habitId)).limit(1))[0];
     (await withUserTransaction(tx, userId, async (tx) => {
       (await tx.delete(habitLogs).where(and(eq(habitLogs.habitId, q.habitId!), eq(habitLogs.date, q.date))));
       if (tier) (await tx.insert(habitLogs).values({ id: newId(), habitId: q.habitId!, userId, date: q.date, tierDone: tier, createdAt: nowIso() }));
-      (await appendEvent(tx, { userId, type: "habit.logged", payload: { habitId: q.habitId, tier, xp: h?.xp ?? 0, pillar: h?.pillar, gameDay: q.date }, gameDay: q.date }));
+      (await appendEvent(tx, {
+        userId,
+        type: "habit.logged",
+        payload: { habitId: q.habitId, tier, xp: h?.xp ?? 0, pillar: h?.pillar, gameDay: q.date, ...(clientRequestId ? { request } : {}) },
+        gameDay: q.date,
+        clientRequestId,
+      }));
     }));
     return (await refreshProgress(tx, userId, q.date));
   }
   (await tx.update(quests).set({ tierDone: tier, updatedAt: nowIso() }).where(eq(quests.id, questId)));
-  (await appendEvent(tx, { userId, type: "quest.progress", payload: { questId, kind: q.kind, tier, from: q.tierDone, xp: q.xp, manual: true }, gameDay: q.date }));
+  (await appendEvent(tx, {
+    userId,
+    type: "quest.progress",
+    payload: { questId, kind: q.kind, tier, from: q.tierDone, xp: q.xp, manual: true, ...(clientRequestId ? { request } : {}) },
+    gameDay: q.date,
+    clientRequestId,
+  }));
   return [{ id: questId, tier }];
 });
 }

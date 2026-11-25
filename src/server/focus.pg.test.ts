@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, type TestDb } from "@/db/testing";
-import { focusSessions, personalTasks } from "@/db/schema";
+import { focusSessions, habits, habitLogs, personalTasks, quests } from "@/db/schema";
 import { createUser } from "./auth";
 import { completeFocusBlock, discardFocus, FocusConflict, idlePause, manualFocus, minutesForDay, openSession, pauseFocus, resumeFocus, startFocus, stopFocus } from "./focus";
 import { listEvents } from "@/events/store";
@@ -103,6 +103,47 @@ describe("PostgreSQL focus transactions", () => {
       payload: { request: { sessionId: started.id, blockMinutes: 25 }, taskAutoCompleted: true },
     });
     expect(await listEvents(fixture.db, userId, "personal_task.completed")).toHaveLength(1);
+  });
+
+  it("leaves activity-driven Today quests to their tracked progress", async () => {
+    const habitId = "focus-block-habit";
+    const questId = "today-activity-quest";
+    await fixture.db.insert(habits).values({
+      id: habitId,
+      userId,
+      title: "Run for 20 minutes",
+      pillar: "body",
+      tiersJson: JSON.stringify({ seed: 1, standard: 2, stretch: 3 }),
+      metricJson: JSON.stringify({ type: "minutes", unit: "minutes" }),
+      status: "active",
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    });
+    await fixture.db.insert(quests).values({
+      id: questId,
+      userId,
+      date: "2026-11-13",
+      kind: "pillar",
+      title: "Run for 20 minutes",
+      tiersJson: JSON.stringify({ seed: "Seed", standard: "Standard", stretch: "Stretch" }),
+      targetJson: JSON.stringify({ metric: "minutes", seed: 10, standard: 20, stretch: 30 }),
+      habitId,
+      status: "open",
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    });
+    const started = await startFocus(fixture.db, userId, {
+      kind: "video",
+      taskSource: "Today",
+      taskId: questId,
+      taskTitle: "Run for 20 minutes",
+    }, { now });
+
+    const result = await completeFocusBlock(fixture.db, userId, started.id, new Date(now.getTime() + 25 * 60_000));
+
+    expect(result).toMatchObject({ blockCompleted: true, taskAutoCompleted: false });
+    expect(await fixture.db.select().from(habitLogs)).toHaveLength(0);
+    expect(await listEvents(fixture.db, userId, "habit.logged")).toHaveLength(0);
   });
 
   it("does not let discard erase a block once 25 active minutes have elapsed", async () => {

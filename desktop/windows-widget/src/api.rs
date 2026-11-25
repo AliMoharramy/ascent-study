@@ -479,12 +479,12 @@ impl ApiClient {
             TaskSource::Today => (
                 Method::POST,
                 format!("api/quests/{}", task.id),
-                json!({"tier":"standard"}),
+                json!({"tier":"standard", "clientRequestId": client_request_id}),
             ),
             TaskSource::Courses => (
                 Method::PATCH,
                 format!("api/lessons/{}", task.id),
-                json!({"status":"done"}),
+                json!({"status":"done", "clientRequestId": client_request_id}),
             ),
             TaskSource::Mine => (
                 Method::PATCH,
