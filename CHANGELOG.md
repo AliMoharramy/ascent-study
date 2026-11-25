@@ -6,6 +6,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Focus sessions persist the selected task source and ID, keeping the website and Windows widget on the same task across refreshes and restarts.
 - Native Windows focus companion (Rust + Slint): server-synced focus sessions, task-title capsule, task lists, AI suggestions, tray controls, and per-user packaging.
 - Demo data (`npm run demo:seed`, `make demo`): three weeks of realistic sample history in a throw-away local database, and a
   regenerable screenshot gallery (`npm run screenshots`) used by the README.

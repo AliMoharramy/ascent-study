@@ -36,16 +36,24 @@ describe("PostgreSQL focus transactions", () => {
     expect(failed?.status === "rejected" && failed.reason).toBeInstanceOf(FocusConflict);
   });
 
-  it("persists the selected task title across focus transitions", async () => {
+  it("persists the selected task source, ID, and title across focus transitions", async () => {
     const started = await startFocus(fixture.db, userId, {
       kind: "video",
+      taskSource: "Courses",
+      taskId: "lesson-17",
       taskTitle: "Review chapter 4",
     }, { now });
-    expect(started.taskTitle).toBe("Review chapter 4");
+    expect(started).toMatchObject({
+      taskSource: "Courses",
+      taskId: "lesson-17",
+      taskTitle: "Review chapter 4",
+    });
 
     await pauseFocus(fixture.db, userId, new Date("2026-11-14T00:39:00Z"));
     expect(await openSession(fixture.db, userId)).toMatchObject({
       id: started.id,
+      taskSource: "Courses",
+      taskId: "lesson-17",
       taskTitle: "Review chapter 4",
       status: "paused",
     });
