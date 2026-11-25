@@ -53,6 +53,15 @@ browser ──HTTP──▶ route handler / server component
 7. **PostgreSQL SQL only.** Booleans are booleans, dates are `DATE`, timestamps are `timestamptz` (mapped to ISO strings),
    `bigint`/`numeric` results are parsed to numbers. Raw SQL lives next to the module that owns it.
 
+## Focus block behavior
+
+The website and Windows widget use the same server-owned focus session. A running block ends after 25 active minutes;
+paused time is excluded, and the database records exactly 25 minutes at that boundary. The server finalizes the block
+when a client reports the boundary or requests a session transition after it, so closing one client does not leave a
+completed block running. Eligible selected course lessons, personal tasks, and manually completable Today items use
+their existing server services; progress-driven Today goals continue to update from recorded focus and their existing
+progress rules. Finishing earlier records elapsed time without automatically completing the selected task.
+
 ## Where things live
 
 | Path | What |
