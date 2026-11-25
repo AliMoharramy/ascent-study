@@ -14,6 +14,7 @@ import { localToUtc } from "@/lib/time";
 import { setKv } from "./kv";
 import { importSubjects, loadSubjectsFile } from "./seed";
 import { startFocus, stopFocus } from "./focus";
+import { FOCUS_BLOCK_MINUTES } from "@/domain/timer";
 import { logTest } from "./tests";
 import { closeDay, declareLifeEvent, generateDay, questsForDay, refreshProgress, rollover, useShield } from "./quests";
 import { ensureDefaultConfig } from "./config";
@@ -31,8 +32,14 @@ async function setup(): Promise<{
 }
 async function study(db: Db, userId: string, day: string, minutes: number, chapterId: string | null, subjectId: string | null = null) {
     const start = localToUtc(day, "10:00");
-    (await startFocus(db, userId, { kind: "video", chapterId, subjectId }, { now: start }));
-    (await stopFocus(db, userId, new Date(start.getTime() + minutes * 60000)));
+    let elapsedMinutes = 0;
+    while (elapsedMinutes < minutes) {
+        const blockMinutes = Math.min(FOCUS_BLOCK_MINUTES, minutes - elapsedMinutes);
+        const blockStart = new Date(start.getTime() + elapsedMinutes * 60000);
+        (await startFocus(db, userId, { kind: "video", chapterId, subjectId }, { now: blockStart }));
+        (await stopFocus(db, userId, new Date(blockStart.getTime() + blockMinutes * 60000)));
+        elapsedMinutes += blockMinutes;
+    }
 }
 describe("rollover + quests (T-R1-09)", () => {
     // 175 simulated days of real round-trips to PostgreSQL: slow by design (~1–2 min), not a performance problem.

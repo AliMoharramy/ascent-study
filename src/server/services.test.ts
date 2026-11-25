@@ -87,11 +87,11 @@ describe("focus timer service (T-R0-06)", () => {
         // "refresh": state is read back from the DB
         expect(view((await openSession(db, userId))!, t("2026-11-14T06:30:00Z")).minutes).toBe(20);
         (await resumeFocus(db, userId, t("2026-11-14T06:30:00Z")));
-        const done = (await stopFocus(db, userId, t("2026-11-14T06:55:00Z")));
-        expect(done.minutes).toBe(45);
+        const done = (await stopFocus(db, userId, t("2026-11-14T06:35:00Z")));
+        expect(done.minutes).toBe(25);
         expect(done.gameDay).toBe("2026-11-14");
         expect((await openSession(db, userId))).toBeUndefined();
-        expect((await minutesForDay(db, userId, "2026-11-14"))).toBe(45);
+        expect((await minutesForDay(db, userId, "2026-11-14"))).toBe(25);
         expect((await listEvents(db, userId)).map((e) => e.type)).toEqual(["focus.started", "focus.paused", "focus.resumed", "focus.stopped"]);
     });
     it("a session at 01:30 Tehran counts for the previous day", async () => {

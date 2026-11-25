@@ -169,7 +169,9 @@ describe("R1/R2 services", () => {
         expect((await getNightly(db, userId, "2026-11-16")).checklist).toEqual(["Shoes", "Book"]);
         (await setGoal(db, userId, "2026-11-16", { minutes: 30 }));
         (await startFocus(db, userId, { kind: "video" }, { now: localToUtc("2026-11-16", "10:00") }));
-        (await stopFocus(db, userId, localToUtc("2026-11-16", "10:40")));
+        (await stopFocus(db, userId, localToUtc("2026-11-16", "10:25")));
+        (await startFocus(db, userId, { kind: "video" }, { now: localToUtc("2026-11-16", "10:25") }));
+        (await stopFocus(db, userId, localToUtc("2026-11-16", "10:35")));
         (await refreshProgress(db, userId, "2026-11-16"));
         expect((await goalView(db, userId, "2026-11-16")).done).toBe(true);
         expect((await queryOne<{
