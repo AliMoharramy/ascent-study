@@ -68,6 +68,12 @@ pub struct FocusSession {
     pub status: String,
     pub elapsed_ms: i64,
     #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub task_source: Option<String>,
+    #[serde(default)]
+    pub task_id: Option<String>,
+    #[serde(default)]
     pub task_title: Option<String>,
 }
 
@@ -105,7 +111,6 @@ struct Course {
     id: String,
     title: String,
     subject_id: String,
-    kind: String,
 }
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -147,7 +152,6 @@ pub struct WidgetTask {
     pub title: String,
     pub detail: String,
     pub source: TaskSource,
-    pub focus_kind: String,
     pub subject_id: String,
     pub chapter_id: String,
     pub done: bool,
@@ -323,10 +327,11 @@ impl ApiClient {
         &self,
         action: &str,
         task: Option<&WidgetTask>,
+        fallback_kind: &str,
     ) -> Result<Option<FocusSession>, ApiError> {
         let mut payload = json!({ "action": action });
         if action == "start" {
-            payload["kind"] = json!(task.map(|item| item.focus_kind.as_str()).unwrap_or("other"));
+            payload["kind"] = json!(fallback_kind);
             payload["subjectId"] =
                 json!(task.and_then(
                     |item| (!item.subject_id.is_empty()).then_some(item.subject_id.as_str())
@@ -336,6 +341,10 @@ impl ApiClient {
                     |item| (!item.chapter_id.is_empty()).then_some(item.chapter_id.as_str())
                 ));
             payload["taskTitle"] = json!(task.map(|item| item.title.as_str()));
+            payload["taskSource"] = json!(task.map(|item| item.source.label()));
+            payload["taskId"] = json!(task
+                .filter(|item| item.source != TaskSource::Ai)
+                .map(|item| item.id.as_str()));
             payload["clientRequestId"] = json!(Uuid::new_v4().to_string());
         }
         let response: FocusEnvelope = self.request(Method::POST, "api/focus", Some(payload))?;
@@ -384,12 +393,6 @@ impl ApiClient {
                 title: quest.title,
                 detail,
                 source: TaskSource::Today,
-                focus_kind: match metric {
-                    "tests" => "tests",
-                    "minutes" => "video",
-                    _ => "other",
-                }
-                .to_string(),
                 subject_id,
                 chapter_id,
                 done: quest.tier_done.is_some(),
@@ -411,12 +414,6 @@ impl ApiClient {
                     title: lesson.title,
                     detail: format!("{} · Lesson {}", detail.course.title, lesson.no),
                     source: TaskSource::Courses,
-                    focus_kind: if detail.course.kind == "tips_tests" {
-                        "tests"
-                    } else {
-                        "video"
-                    }
-                    .to_string(),
                     subject_id: detail.course.subject_id.clone(),
                     chapter_id: lesson.chapter_ids.first().cloned().unwrap_or_default(),
                     done: false,
@@ -435,7 +432,6 @@ impl ApiClient {
                 title: task.title,
                 detail: "Personal task".to_string(),
                 source: TaskSource::Mine,
-                focus_kind: "other".to_string(),
                 subject_id: String::new(),
                 chapter_id: String::new(),
                 done: task.status == "done",
