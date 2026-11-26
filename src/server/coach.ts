@@ -1,14 +1,16 @@
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { withUserTransaction, queryOne, type Db } from "@/db/client";
-import { dayCloses, errorItems, sleepLogs } from "@/db/schema";
+import { chapters, dayCloses, errorItems, focusSessions, sleepLogs, subjects } from "@/db/schema";
 import { localCoachReply, routeIntent, type CoachContext, type CoachIntent } from "@/domain/coach";
+import { formatStudyReport, parseStudyPeriod, summarizeStudySessions, type StudyReportSession } from "@/domain/studyReport";
 import { lightenWeek, type LightenProposal } from "@/domain/negotiate";
 import { sleepDebt } from "@/domain/wellness";
 import { appendEvent } from "@/events/store";
 import { activeConfig } from "@/events/projections";
 import { addDaysIso } from "@/i18n/jalali";
 import { daysToExam, TOTAL_WEEKS, weekNoOf, weekStartOf } from "@/lib/campaign";
+import { DEFAULT_TZ } from "@/lib/time";
 import { newId, nowIso } from "@/lib/ids";
 import { remoteCall } from "./ai";
 import { burnoutView } from "./burnout";
@@ -97,10 +99,63 @@ async function pushMsg(db: Db, userId: string, msg: Omit<CoachMsg, "id" | "at">)
 });
 }
 
-export async function sendCoachMessage(db: Db, userId: string, text: string, today: string) {
+export async function sendCoachMessage(db: Db, userId: string, text: string, today: string, timeZone = DEFAULT_TZ) {
   const p = coachMessageInput.parse({ text });
-  const cfg = (await activeConfig(db, userId));
   const intent = routeIntent(p.text);
+  if (intent === "study_report") {
+    (await pushMsg(db, userId, { role: "user", text: p.text, intent }));
+    const persian = /[\u0600-\u06ff]/.test(p.text);
+    const parsed = parseStudyPeriod(p.text, today);
+    let reply: string;
+    if (parsed.status === "invalid") {
+      reply = persian
+        ? "بازه زمانی را متوجه نشدم. از امروز، دیروز، این هفته، هفته گذشته، این ماه، N روز اخیر یا تاریخ‌هایی مثل 1405/08/10 تا 1405/08/16 استفاده کنید."
+        : "I couldn't understand that time range. Try today, yesterday, this week, last week, this month, the last N days, or dates like 2026-11-01 to 2026-11-07.";
+    } else {
+      const rows = await db.select({
+        id: focusSessions.id,
+        gameDay: focusSessions.gameDay,
+        startedAt: focusSessions.startedAt,
+        minutes: focusSessions.minutes,
+        kind: focusSessions.kind,
+        subjectId: focusSessions.subjectId,
+        subjectNameEn: subjects.nameEn,
+        subjectNameFa: subjects.nameFa,
+        chapterId: focusSessions.chapterId,
+        chapterTitle: chapters.title,
+        taskTitle: focusSessions.taskTitle,
+      })
+        .from(focusSessions)
+        .leftJoin(subjects, eq(focusSessions.subjectId, subjects.id))
+        .leftJoin(chapters, eq(focusSessions.chapterId, chapters.id))
+        .where(and(
+          eq(focusSessions.userId, userId),
+          eq(focusSessions.status, "ended"),
+          gte(focusSessions.minutes, 1),
+          gte(focusSessions.gameDay, parsed.period.startDate),
+          lte(focusSessions.gameDay, parsed.period.endDate),
+        ))
+        .orderBy(desc(focusSessions.gameDay), desc(focusSessions.startedAt));
+      const sessions: StudyReportSession[] = rows.map((row) => ({
+        id: row.id,
+        gameDay: row.gameDay,
+        startedAt: row.startedAt,
+        minutes: row.minutes,
+        kind: row.kind,
+        subjectId: row.subjectId,
+        subjectName: (persian ? row.subjectNameFa : row.subjectNameEn) ?? row.subjectNameEn ?? row.subjectNameFa,
+        chapterId: row.chapterId,
+        chapterTitle: row.chapterTitle,
+        taskTitle: row.taskTitle,
+      }));
+      reply = formatStudyReport(summarizeStudySessions(sessions), parsed.period, { persian, timeZone });
+    }
+    (await appendEvent(db, { userId, type: "coach.message", payload: { intent, provider: "local" }, gameDay: today }));
+    const messages = (await pushMsg(db, userId, { role: "coach", text: reply, intent }));
+    return { messages, proposal: (await proposalOf(db, userId)), provider: "local" as const };
+  }
+
+  const cfg = (await activeConfig(db, userId));
   const ctx = (await coachContext(db, userId, today));
   (await pushMsg(db, userId, { role: "user", text: p.text, intent }));
 
