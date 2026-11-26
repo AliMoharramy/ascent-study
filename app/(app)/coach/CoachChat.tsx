@@ -13,6 +13,7 @@ const CHIPS = [
   { label: "Quiz me", text: "Quiz me on what's due" },
   { label: "Review errors", text: "Help me review my errors" },
   { label: "Plan my week", text: "How is my plan for this week?" },
+  { label: "Study report", text: "How much did I study this week?" },
   { label: "Lighten my week", text: "This week is too heavy — lighten my plan" },
   { label: "Sleep check", text: "How is my sleep?" },
   { label: "Burnout check", text: "Am I heading for burnout?" },
@@ -71,7 +72,7 @@ export function CoachChat({ data, mascots }: { data: V; mascots: boolean }) {
           {v.messages.length === 0 && (
             <div className="grid flex-1 place-items-center gap-2 py-6 text-center">
               <MascotSlot character="archie" state="reading" size="sm" enabled={mascots} />
-              <p className="max-w-sm text-body-s text-muted">Ask Archie anything about your week — or tap a chip below. Plan changes are always drafted first and applied only when you approve.</p>
+              <p className="max-w-sm text-body-s text-muted">Ask Archie about your study history, your week, or tap a chip below. Plan changes are always drafted first and applied only when you approve.</p>
             </div>
           )}
           {v.messages.map((m) => (

@@ -3,9 +3,20 @@
  * when remote AI is enabled the server may only send numeric aggregates — never the raw chat text (F-AI-06).
  */
 
-export type CoachIntent = "quiz" | "errors" | "plan" | "lighten" | "sleep" | "burnout" | "summary" | "help";
+export type CoachIntent = "study_report" | "quiz" | "errors" | "plan" | "lighten" | "sleep" | "burnout" | "summary" | "help";
 
 const RULES: Array<{ intent: CoachIntent; words: RegExp[] }> = [
+  { intent: "study_report", words: [
+    /\bhow\s+much\b.*\b(?:study|studied|studying|focus)\b/i,
+    /\bhow\s+long\s+did\s+i\s+study\b/i,
+    /\bhow\s+many\b.*\b(?:study|studied|studying|focus)\b/i,
+    /\b(?:study|studying)\s+(?:time|hours|sessions?|report|summary)\b/i,
+    /\bfocus\s+(?:time|sessions?|report)\b/i,
+    /\b(?:report|summary)\b.*\b(?:today|yesterday|week|month|days?)\b/i,
+    /\b(?:show|list|report|summari[sz]e)\b.*\b(?:study|studied|focus|sessions?)\b/i,
+    /چقدر.*(?:درس|مطالعه|تمرکز)|(?:گزارش|خلاصه).*(?:مطالعه|درس|تمرکز)|(?:زمان|ساعت).*(?:مطالعه|درس|تمرکز)|(?:درس|مطالعه).*(?:کردم|خواندم|خوندم|گزارش|ساعت|چقدر)/i,
+    /(?:گزارش|خلاصه).*(?:امروز|دیروز|هفته|ماه|\d+\s*روز)/i,
+  ] },
   { intent: "lighten", words: [/lighten|lighter|too heavy|overload|reduce.*load|سبک|کمتر.*فشار|سنگین|حجم.*کم/i] },
   { intent: "quiz", words: [/quiz|test me|flashcard|drill|کوییز|آزمون.*بگیر|بپرس|مرور.*کارت/i] },
   { intent: "errors", words: [/error|mistake|wrong|why.*fail|غلط|اشتباه|خطا|چرا.*خراب/i] },
@@ -41,6 +52,8 @@ const pct = (n: number | null) => (n === null ? "no data yet" : `${n}%`);
 /** Deterministic local replies from numeric context only. The server may replace the prose via remote AI. */
 export function localCoachReply(intent: CoachIntent, c: CoachContext): string {
   switch (intent) {
+    case "study_report":
+      return `I’ll check your completed focus sessions for the requested period and break down the time by day, subject, chapter, and focus type.`;
     case "quiz":
       return c.dueCards > 0
         ? `You have ${c.dueCards} cards due in the Forge. A 15-minute recall drill right now beats re-reading. Want me to route you? Tap the chip again or open the Forge.`

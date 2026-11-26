@@ -18,7 +18,7 @@ const input = z.discriminatedUnion("action", [
 export const POST = api(async ({ db, userId, req, session }) => {
   const b = input.parse(await body(req));
   const d = day(session);
-  if (b.action === "message") return (await sendCoachMessage(db, userId, b.text, d));
+  if (b.action === "message") return (await sendCoachMessage(db, userId, b.text, d, session.user.timezone));
   if (b.action === "approve") return (await approveProposal(db, userId, b.proposalId, d));
   return (await rejectProposal(db, userId, b.proposalId, d));
 });
