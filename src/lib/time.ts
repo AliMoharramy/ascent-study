@@ -55,12 +55,40 @@ export function tzOffsetMinutes(date: Date, timeZone = DEFAULT_TZ): number {
 export function localToUtc(isoDate: string, hhmm: string, timeZone = DEFAULT_TZ): Date {
   const [h, m] = hhmm.split(":").map(Number);
   const guess = new Date(`${isoDate}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00Z`);
-  const offset = tzOffsetMinutes(guess, timeZone);
-  return new Date(guess.getTime() - offset * 60_000);
+  const fromOffset = (offset: number) => new Date(guess.getTime() - offset * 60_000);
+  const first = fromOffset(tzOffsetMinutes(guess, timeZone));
+  const firstParts = localParts(first, timeZone);
+  const matches = (parts: ReturnType<typeof localParts>) =>
+    parts.date === isoDate && parts.hour === h && parts.minute === m && parts.second === 0;
+  if (matches(firstParts)) return first;
+
+  const second = fromOffset(tzOffsetMinutes(first, timeZone));
+  const secondParts = localParts(second, timeZone);
+  if (matches(secondParts)) return second;
+
+  // For a skipped wall time, move forward through the gap to the nearest local time after it.
+  const wallTime = (parts: ReturnType<typeof localParts>) => {
+    const [year, month, day] = parts.date.split("-").map(Number);
+    return Date.UTC(year!, month! - 1, day!, parts.hour, parts.minute, parts.second);
+  };
+  const candidates = [
+    { date: first, wallTime: wallTime(firstParts) },
+    { date: second, wallTime: wallTime(secondParts) },
+  ];
+  const after = candidates
+    .filter((candidate) => candidate.wallTime >= guess.getTime())
+    .sort((a, b) => a.wallTime - b.wallTime)[0];
+  if (after) return after.date;
+  return candidates.sort((a, b) => b.wallTime - a.wallTime)[0]!.date;
 }
 
 /** Bounds [start, end) in UTC of a game day. */
 export function gameDayBounds(isoDate: string, timeZone = DEFAULT_TZ, rolloverHour = DEFAULT_ROLLOVER_HOUR) {
-  const start = localToUtc(isoDate, `${String(rolloverHour).padStart(2, "0")}:00`, timeZone);
-  return { start, end: new Date(start.getTime() + 86_400_000) };
+  const rollover = `${String(rolloverHour).padStart(2, "0")}:00`;
+  const nextDay = new Date(`${isoDate}T00:00:00.000Z`);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  return {
+    start: localToUtc(isoDate, rollover, timeZone),
+    end: localToUtc(nextDay.toISOString().slice(0, 10), rollover, timeZone),
+  };
 }

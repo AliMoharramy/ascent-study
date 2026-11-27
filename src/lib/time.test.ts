@@ -20,6 +20,20 @@ describe("time / game day", () => {
     expect(gameDay(new Date("2026-03-08T08:30:00Z"), "America/New_York", 4)).toBe("2026-03-08");
   });
 
+  it("ends game-day bounds at the next local rollover through DST changes", () => {
+    const springForward = gameDayBounds("2026-03-07", "America/New_York", 4);
+    expect(springForward.start.toISOString()).toBe("2026-03-07T09:00:00.000Z");
+    expect(springForward.end.toISOString()).toBe("2026-03-08T08:00:00.000Z");
+
+    const fallBack = gameDayBounds("2026-10-31", "America/New_York", 4);
+    expect(fallBack.start.toISOString()).toBe("2026-10-31T08:00:00.000Z");
+    expect(fallBack.end.toISOString()).toBe("2026-11-01T09:00:00.000Z");
+  });
+
+  it("moves a skipped local rollover forward through the spring gap", () => {
+    expect(localToUtc("2026-03-29", "02:00", "Europe/Paris").toISOString()).toBe("2026-03-29T01:00:00.000Z");
+  });
+
   it("localToUtc and bounds", () => {
     expect(localToUtc("2026-11-14", "04:00").toISOString()).toBe("2026-11-14T00:30:00.000Z");
     const b = gameDayBounds("2026-11-14");
