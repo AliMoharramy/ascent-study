@@ -171,4 +171,5 @@
 - [x] Require each generated review to contain one cloze marker whose answer reconstructs its exact source excerpt after Unicode and whitespace normalization.
 - [x] Give retry and Forge review actions request IDs, event-backed replay protection, same-state idempotency, and a hash-only retry event payload.
 - [x] Recover from decision/review persistence failures with a retryable state and expose a retry after a stalled five-minute processing lease.
-- [x] Verify the follow-up against the disposable local PostgreSQL database only: `npm test` (21 files, 212 tests), PostgreSQL schema/study-log/reminder suites (10 + 10 + 3 tests), typecheck, lint, production build, and local smoke.
+- [x] Compute study-log defaults from the local wall-clock rollover so daylight-saving transitions cannot shift the selected study day.
+- [x] Verify the follow-up against the disposable local PostgreSQL database only: `npm test` (21 files, 213 tests), PostgreSQL schema/study-log/reminder suites (10 + 10 + 3 tests), typecheck, lint, production build, and local smoke.

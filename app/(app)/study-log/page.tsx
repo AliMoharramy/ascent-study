@@ -1,5 +1,6 @@
 import { asc, eq, inArray, isNull, or } from "drizzle-orm";
 import { chapters, courses, lessonChapters, lessons } from "@/db/schema";
+import { currentStudyGameDay } from "@/domain/studyLog";
 import { requireUser } from "@/server/context";
 import { listStudyLogs } from "@/server/studyLogs";
 import { PageHeader } from "@/ui/components";
@@ -8,7 +9,8 @@ import { StudyLogClient } from "./StudyLogClient";
 export const metadata = { title: "Study log" };
 
 export default async function StudyLogPage() {
-  const { db, userId, today } = await requireUser();
+  const { db, userId, now, tz, rollover } = await requireUser();
+  const today = currentStudyGameDay(now, tz, rollover);
   const visibleCourses = await db.select({ id: courses.id, title: courses.title, subjectId: courses.subjectId })
     .from(courses)
     .where(or(isNull(courses.userId), eq(courses.userId, userId)))

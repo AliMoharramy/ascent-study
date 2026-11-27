@@ -51,6 +51,7 @@ The client supplies a request id for creation retries; key reuse with a differen
 ## Date and content rules
 
 - `studiedOn` is an ISO date in the user’s game-day calendar. The API computes today using the authenticated user’s timezone and rollover hour when the client omits a date.
+- Evaluate the rollover against the user’s local wall-clock hour, including daylight-saving transitions; do not subtract a fixed UTC duration before determining the local date.
 - Initial dates use fixed offsets `[3, 7, 14, 30]`; server date arithmetic is calendar-day arithmetic and must handle month/year/leap-day boundaries without converting through local midnight.
 - The review content and stored source are always tied to the same study log. AI may only create content from submitted material. Missing material is rejected before AI; insufficient material produces a persisted request for more detail with zero tasks.
 - All AI response fields, enum values, string lengths, and the expected four checkpoint entries are schema-validated before persistence.

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { addDaysIso } from "@/i18n/jalali";
-import { gameDay } from "@/lib/time";
+import { localParts } from "@/lib/time";
 
 export const STUDY_REVIEW_OFFSETS = [3, 7, 14, 30] as const;
 export const STUDY_LOG_ANALYSIS_LEASE_MS = 5 * 60_000;
@@ -90,7 +90,8 @@ export function validateStudyLogDecision(sourceText: string, candidate: unknown)
 }
 
 export function currentStudyGameDay(now: Date, timezone: string, rolloverHour: number): string {
-  return gameDay(now, timezone, rolloverHour);
+  const local = localParts(now, timezone);
+  return local.hour < rolloverHour ? addDaysIso(local.date, -1) : local.date;
 }
 
 export function reviewDatesForStudyDay(studiedOn: string) {

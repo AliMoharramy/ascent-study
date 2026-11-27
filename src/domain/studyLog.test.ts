@@ -23,6 +23,11 @@ describe("study-log domain", () => {
     expect(studyLog.currentStudyGameDay(instant, "America/Los_Angeles", 4)).toBe("2026-11-13");
   });
 
+  it("keeps the local rollover correct across a daylight-saving transition", () => {
+    expect(studyLog.currentStudyGameDay(new Date("2026-03-08T07:30:00Z"), "America/New_York", 4)).toBe("2026-03-07");
+    expect(studyLog.currentStudyGameDay(new Date("2026-03-08T08:30:00Z"), "America/New_York", 4)).toBe("2026-03-08");
+  });
+
   it("rejects blank or oversized source and impossible ISO study dates", () => {
     const input = { topic: "BFS", sourceText: " ", studiedOn: "2026-02-28", clientRequestId: "request-001", consentToRemoteAi: true };
     expect(studyLog.studyLogSubmissionSchema.safeParse(input)).toMatchObject({ success: false });
