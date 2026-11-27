@@ -163,7 +163,7 @@
 - [x] **Step 4: Run `npm run typecheck`, `npm run lint`, and `npm run build`.** Result: all passed.
 - [x] **Step 5: Run the local smoke test** on the disposable production build and inspect `git diff --check`; confirm no timer/focus implementation files were changed and review the complete diff for unrelated changes. Result: smoke passed, diff check is clean, and the rendered form enables after topic/source input.
 - [x] **Step 6: Commit** docs and any final fixes with `docs: document AI-assisted study reviews` (or a focused fix commit if verification requires one).
-- [ ] **Step 7: Push `codex/ai-study-log-review-planner`, open a PR targeting `main` with `Closes #21`, then close issue #21 as explicitly requested.**
+- [x] **Step 7: Push `codex/ai-study-log-review-planner`, open [PR #22](https://github.com/AliMoharramy/ascent-study/pull/22) targeting `main` with `Closes #21`, then close issue #21 as requested.**
 
 ### Code-review follow-up: privacy, grounding, and recovery
 
