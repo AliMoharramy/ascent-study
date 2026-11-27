@@ -12,6 +12,14 @@ export function createStableMutationAttempt<T extends Record<string, unknown>>(
   return pending ?? { clientRequestId: createId(), body: Object.freeze({ ...body }) };
 }
 
+/** Rebuild an attempt after reload from the ID stored separately from its private, in-memory payload. */
+export function restoreMutationAttempt<T extends Record<string, unknown>>(
+  clientRequestId: string,
+  body: T,
+): StableMutationAttempt<T> {
+  return { clientRequestId, body: Object.freeze({ ...body }) };
+}
+
 export function mutationAttemptBody<T extends Record<string, unknown>>(
   attempt: StableMutationAttempt<T>,
 ): T & { clientRequestId: string } {

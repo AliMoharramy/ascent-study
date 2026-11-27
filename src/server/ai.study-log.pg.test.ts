@@ -39,11 +39,15 @@ const decision = {
   ],
 };
 
-function providerResponse(content: string, status = 200): Response {
+function providerResponse(
+  content: string,
+  status = 200,
+  usage: unknown = { prompt_tokens: 1230, completion_tokens: 450 },
+): Response {
   return new Response(
     JSON.stringify({
       choices: [{ message: { content } }],
-      usage: { prompt_tokens: 1230, completion_tokens: 450 },
+      ...(usage === null ? {} : { usage }),
     }),
     {
       status,
@@ -107,6 +111,7 @@ describe("study-log AI adapter privacy and budget admission", () => {
       purpose: "study_log_review_planning",
       tokensIn: 1230,
       tokensOut: 450,
+      usageStatus: "actual",
     });
     expect(logs[0]!.costEst).toBeGreaterThan(0);
     expect(logs[0]!.requestSummary).toBe("study_log_review_planning: redacted");
@@ -225,6 +230,93 @@ describe("study-log AI adapter privacy and budget admission", () => {
       .from(aiBudgetReservations)
       .where(eq(aiBudgetReservations.userId, userId));
     expect(reservations[0]).toMatchObject({ status: "uncertain", reservedCost: expect.any(Number) });
+  });
+
+  it("keeps missing provider usage unknown and reserves the estimate instead of settling it as actual", async () => {
+    await enableRemoteAi();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(providerResponse(JSON.stringify({ ok: true }), 200, null));
+
+    const result = await remoteCall(
+      fixture.db,
+      userId,
+      "budget_missing_usage",
+      "system",
+      "short request",
+      z.object({ ok: z.boolean() }),
+      today,
+    );
+
+    expect(result?.value).toEqual({ ok: true });
+    const calls = await fixture.db.select().from(aiCalls).where(eq(aiCalls.userId, userId));
+    const reservations = await fixture.db.select().from(aiBudgetReservations).where(eq(aiBudgetReservations.userId, userId));
+    expect(calls[0]).toMatchObject({ tokensIn: 0, tokensOut: 0, usageStatus: "unknown" });
+    expect(reservations[0]).toMatchObject({ status: "uncertain", settledCost: 0 });
+    expect(calls[0]!.costEst).toBe(reservations[0]!.reservedCost);
+    expect((await aiStatus(fixture.db, userId, today)).monthCost).toBe(reservations[0]!.reservedCost);
+  });
+
+  it.each([
+    ["negative count", { prompt_tokens: -1, completion_tokens: 10 }],
+    ["fractional count", { prompt_tokens: 10.5, completion_tokens: 10 }],
+    ["excess output count", { prompt_tokens: 10, completion_tokens: 701 }],
+  ])("treats %s as unknown usage and retains the conservative reservation", async (_label, usage) => {
+    await enableRemoteAi();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(providerResponse(JSON.stringify({ ok: true }), 200, usage));
+
+    const result = await remoteCall(
+      fixture.db,
+      userId,
+      "budget_invalid_usage",
+      "system",
+      "short request",
+      z.object({ ok: z.boolean() }),
+      today,
+    );
+
+    expect(result?.value).toEqual({ ok: true });
+    const calls = await fixture.db.select().from(aiCalls).where(eq(aiCalls.userId, userId));
+    const reservations = await fixture.db.select().from(aiBudgetReservations).where(eq(aiBudgetReservations.userId, userId));
+    expect(calls[0]).toMatchObject({ tokensIn: 0, tokensOut: 0, usageStatus: "unknown" });
+    expect(reservations[0]).toMatchObject({ status: "uncertain", settledCost: 0 });
+    expect(calls[0]!.costEst).toBe(reservations[0]!.reservedCost);
+  });
+
+  it("settles valid usage above its reservation and blocks later calls after the app-level cap is exceeded", async () => {
+    await enableRemoteAi({ monthlyCostCapUsd: 0.001 });
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(providerResponse(
+      JSON.stringify({ ok: true }),
+      200,
+      { prompt_tokens: 10_000, completion_tokens: 700 },
+    ));
+
+    const first = await remoteCall(
+      fixture.db,
+      userId,
+      "budget_settlement_overrun",
+      "system",
+      "short request",
+      z.object({ ok: z.boolean() }),
+      today,
+    );
+
+    expect(first?.value).toEqual({ ok: true });
+    const reservation = (await fixture.db.select().from(aiBudgetReservations).where(eq(aiBudgetReservations.userId, userId)))[0]!;
+    const call = (await fixture.db.select().from(aiCalls).where(eq(aiCalls.userId, userId)))[0]!;
+    expect(reservation.status).toBe("settled");
+    expect(reservation.settledCost).toBeGreaterThan(reservation.reservedCost);
+    expect(call.usageStatus).toBe("actual");
+    expect((await aiStatus(fixture.db, userId, today)).monthCost).toBeGreaterThan(0.001);
+
+    expect(await remoteCall(
+      fixture.db,
+      userId,
+      "budget_after_overrun",
+      "system",
+      "short request",
+      z.object({ ok: z.boolean() }),
+      today,
+    )).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it("recovers stale reservations conservatively and accounts by game-day and game-day month", async () => {

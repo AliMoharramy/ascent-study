@@ -901,6 +901,7 @@ export const aiCalls = pgTable("ai_calls", {
   provider: text("provider").notNull(),
   tokensIn: integer("tokens_in").notNull().default(0),
   tokensOut: integer("tokens_out").notNull().default(0),
+  usageStatus: text("usage_status").$type<"actual" | "estimated" | "unknown">().notNull().default("estimated"),
   costEst: num("cost_est").notNull().default(0),
   requestSummary: text("request_summary").notNull().default(""),
   responseJson: text("response_json").notNull().default("{}"),
@@ -936,6 +937,7 @@ export const reminders = pgTable("reminders", {
   body: text("body").notNull(),
   dueAt: ts("due_at").notNull(),
   readAt: ts("read_at"),
+  dismissedAt: ts("dismissed_at"),
   createdAt: ts("created_at").notNull(),
 });
 

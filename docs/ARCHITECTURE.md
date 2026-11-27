@@ -80,6 +80,15 @@ and review actions use replay-safe `clientRequestId` events. `app/(app)/forge/St
 directly, so reminder settings never hide them; enabled reminders are materialized presentation rows from due reviews,
 are offered before routine anchors, and use the existing per-day cap.
 
+The AI monthly cost cap is an application-level admission estimate based on configured per-token prices and a
+conservative request-size/output allowance; it is not a provider-enforced hard spend limit. Valid reported token counts
+are recorded as actual usage and settled at their configured-price estimate, even when that amount exceeds the prior
+reservation or monthly cap. Such an overrun is charged to the current accounting month and blocks later admissions
+until that game-day month rolls off. Missing, malformed, or unavailable usage stays unknown and keeps the full
+reservation charged for its game-day and monthly windows; expired in-flight reservations use the same policy.
+Browser recovery stores request IDs and review action metadata in session storage, never source notes, and reconciles
+those IDs through owner-scoped summaries and accepted mutation events.
+
 ## Where things live
 
 | Path | What |

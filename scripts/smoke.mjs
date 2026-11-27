@@ -81,9 +81,13 @@ check("api POST /api/tests", write.status === 200, `HTTP ${write.status}`);
 const studySource = "Breadth-first search uses a queue to visit vertices by distance.";
 const noStudyConsent = await json("/api/study-logs", { topic: "Smoke study log", sourceText: studySource, clientRequestId: `smoke-study-no-consent-${Date.now()}` });
 check("study-log rejects missing AI consent", noStudyConsent.status === 400, `HTTP ${noStudyConsent.status}`);
-const studyWrite = await json("/api/study-logs", { topic: "Smoke study log", sourceText: studySource, clientRequestId: `smoke-study-${Date.now()}`, consentToRemoteAi: true });
+const studyRequestId = `smoke-study-${Date.now()}`;
+const studyWrite = await json("/api/study-logs", { topic: "Smoke study log", sourceText: studySource, clientRequestId: studyRequestId, consentToRemoteAi: true });
 const studyResult = await studyWrite.json().catch(() => ({}));
 check("api POST /api/study-logs", studyWrite.status === 200 && !!studyResult.log?.id, `HTTP ${studyWrite.status}`);
+const reconciledStudy = await call(`/api/study-logs?requestIds=${encodeURIComponent(studyRequestId)}`);
+const reconciliation = await reconciledStudy.json().catch(() => ({}));
+check("api GET study-log request reconciliation", reconciledStudy.status === 200 && reconciliation.studyLogs?.[0]?.clientRequestId === studyRequestId && !("sourceText" in (reconciliation.studyLogs?.[0] ?? {})), `HTTP ${reconciledStudy.status}`);
 if (studyResult.log?.id) {
   const studyDetail = await call(`/api/study-logs/${encodeURIComponent(studyResult.log.id)}`);
   const detailResult = await studyDetail.json().catch(() => ({}));

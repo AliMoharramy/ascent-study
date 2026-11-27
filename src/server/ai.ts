@@ -21,9 +21,10 @@ import { anomalyLog } from "./shop";
  */
 
 type BudgetUsage = { callsToday: number; monthCost: number };
+type AiUsageStatus = "actual" | "estimated" | "unknown";
 
 async function recoverStaleReservations(db: Db, userId: string): Promise<void> {
-  // If a caller disappeared after admission, keep its maximum estimate reserved until its game-day/month window rolls off.
+  // If a caller disappeared after admission, keep its maximum estimate charged until its game-day/month window rolls off.
   const at = nowIso();
   await withUserTransaction(db, userId, async (tx) => {
     await tx.update(aiBudgetReservations).set({ status: "uncertain", updatedAt: at })
@@ -85,7 +86,7 @@ function telemetry(purpose: string, requestSummary: string, response: unknown): 
   return { requestSummary, responseJson: JSON.stringify(response) };
 }
 
-async function logCall(db: Db, userId: string, purpose: string, provider: string, model: string, tokensIn: number, tokensOut: number, costEst: number, requestSummary: string, response: unknown, today: string, reservationId: string | null = null) {
+async function logCall(db: Db, userId: string, purpose: string, provider: string, model: string, tokensIn: number, tokensOut: number, costEst: number, usageStatus: AiUsageStatus, requestSummary: string, response: unknown, today: string, reservationId: string | null = null) {
   const at = nowIso();
   const safe = telemetry(purpose, requestSummary, response);
   await withUserTransaction(db, userId, async (tx) => {
@@ -93,8 +94,8 @@ async function logCall(db: Db, userId: string, purpose: string, provider: string
       await tx.update(aiBudgetReservations).set({ status: "settled", settledCost: costEst, updatedAt: at })
         .where(and(eq(aiBudgetReservations.id, reservationId), eq(aiBudgetReservations.userId, userId), inArray(aiBudgetReservations.status, ["reserved", "uncertain"])));
     }
-    await tx.insert(aiCalls).values({ id: newId(), userId, purpose, model, provider, tokensIn, tokensOut, costEst, requestSummary: safe.requestSummary, responseJson: safe.responseJson, gameDay: today, budgetMonth: today.slice(0, 7), reservationId, createdAt: at });
-    await appendEvent(tx, { userId, type: "ai.called", gameDay: today, payload: { purpose, provider, costEst } });
+    await tx.insert(aiCalls).values({ id: newId(), userId, purpose, model, provider, tokensIn, tokensOut, usageStatus, costEst, requestSummary: safe.requestSummary, responseJson: safe.responseJson, gameDay: today, budgetMonth: today.slice(0, 7), reservationId, createdAt: at });
+    await appendEvent(tx, { userId, type: "ai.called", gameDay: today, payload: { purpose, provider, costEst, usageStatus } });
   });
 }
 
@@ -120,6 +121,7 @@ async function reserveAiBudget(db: Db, userId: string, purpose: string, today: s
       .where(and(eq(aiBudgetReservations.userId, userId), eq(aiBudgetReservations.requestId, requestId))).limit(1))[0];
     if (existing) return null;
     const usage = await budgetUsage(tx, userId, today);
+    // Reserve for a deliberately conservative prompt-size estimate and the full configured output ceiling.
     const rawEstimate = (tokensInEstimate / 1000) * cfg.ai.pricePer1kIn + (700 / 1000) * cfg.ai.pricePer1kOut;
     const reservedCost = Math.ceil(rawEstimate * 10000) / 10000;
     if (usage.callsToday >= cfg.ai.maxCallsPerDay || usage.monthCost + reservedCost > cfg.ai.monthlyCostCapUsd) return null;
@@ -142,23 +144,53 @@ async function markUncertain(db: Db, userId: string, reservationId: string, purp
     const estimatedCost = reservation?.reservedCost ?? 0;
     await tx.update(aiBudgetReservations).set({ status: "uncertain", updatedAt: at })
       .where(and(eq(aiBudgetReservations.id, reservationId), eq(aiBudgetReservations.userId, userId), inArray(aiBudgetReservations.status, ["reserved", "uncertain"])));
-    await tx.insert(aiCalls).values({ id: newId(), userId, purpose, model, provider: "remote", tokensIn: 0, tokensOut: 0, costEst: estimatedCost, requestSummary: safe.requestSummary, responseJson: safe.responseJson, gameDay: today, budgetMonth: today.slice(0, 7), reservationId, createdAt: at });
-    await appendEvent(tx, { userId, type: "ai.called", gameDay: today, payload: { purpose, provider: "remote", costEst: estimatedCost, status: "uncertain" } });
+    await tx.insert(aiCalls).values({ id: newId(), userId, purpose, model, provider: "remote", tokensIn: 0, tokensOut: 0, usageStatus: "unknown", costEst: estimatedCost, requestSummary: safe.requestSummary, responseJson: safe.responseJson, gameDay: today, budgetMonth: today.slice(0, 7), reservationId, createdAt: at });
+    await appendEvent(tx, { userId, type: "ai.called", gameDay: today, payload: { purpose, provider: "remote", costEst: estimatedCost, usageStatus: "unknown", status: "uncertain" } });
   });
+}
+
+async function recordUnknownUsage(db: Db, userId: string, reservationId: string, purpose: string, model: string, today: string): Promise<number> {
+  const at = nowIso();
+  const safe = telemetry(purpose, `${purpose}: usage unavailable`, { status: "succeeded" });
+  return await withUserTransaction(db, userId, async (tx) => {
+    const reservation = (await tx.select({ reservedCost: aiBudgetReservations.reservedCost }).from(aiBudgetReservations)
+      .where(and(eq(aiBudgetReservations.id, reservationId), eq(aiBudgetReservations.userId, userId))).limit(1))[0];
+    const reservedCost = reservation?.reservedCost ?? 0;
+    await tx.update(aiBudgetReservations).set({ status: "uncertain", updatedAt: at })
+      .where(and(eq(aiBudgetReservations.id, reservationId), eq(aiBudgetReservations.userId, userId), inArray(aiBudgetReservations.status, ["reserved", "uncertain"])));
+    await tx.insert(aiCalls).values({
+      id: newId(), userId, purpose, model, provider: "remote", tokensIn: 0, tokensOut: 0,
+      usageStatus: "unknown", costEst: reservedCost, requestSummary: safe.requestSummary,
+      responseJson: safe.responseJson, gameDay: today, budgetMonth: today.slice(0, 7), reservationId, createdAt: at,
+    });
+    await appendEvent(tx, { userId, type: "ai.called", gameDay: today, payload: { purpose, provider: "remote", costEst: reservedCost, usageStatus: "unknown", status: "uncertain" } });
+    return reservedCost;
+  });
+}
+
+function validProviderUsage(value: unknown): { tokensIn: number; tokensOut: number } | null {
+  if (!value || typeof value !== "object") return null;
+  const usage = value as { prompt_tokens?: unknown; completion_tokens?: unknown };
+  const tokensIn = usage.prompt_tokens;
+  const tokensOut = usage.completion_tokens;
+  const maxInteger = 2_147_483_647;
+  if (typeof tokensIn !== "number" || typeof tokensOut !== "number") return null;
+  if (!Number.isSafeInteger(tokensIn) || !Number.isSafeInteger(tokensOut)) return null;
+  if (tokensIn < 0 || tokensOut < 0 || tokensIn > maxInteger || tokensOut > 700) return null;
+  return { tokensIn, tokensOut };
 }
 
 /** Reserves budgets atomically before the remote call; the database transaction ends before fetch starts. */
 export async function remoteCall<T>(db: Db, userId: string, purpose: string, system: string, user: string, schema: z.ZodType<T>, today: string, requestSummary = `${purpose}: numeric aggregates only (guard)`, options: RemoteCallOptions = {}): Promise<{ value: T; cost: number } | null> {
   const st = await aiStatus(db, userId, today);
   if (!st.remoteReady) return null;
-  const tokensInEst = Math.ceil((system.length + user.length) / 3);
+  const tokensInEst = system.length + user.length;
   const reservation = await reserveAiBudget(db, userId, purpose, today, options.requestId ?? newId(), tokensInEst);
   if (!reservation) return null;
 
   const baseUrl = reservation.config.ai.baseUrl.trim() || process.env.AI_BASE_URL?.trim() || "";
   const apiKey = process.env.AI_KEY!.trim();
   const authorization = /^apikey\s/i.test(apiKey) ? apiKey : `Bearer ${apiKey}`;
-  const tokensInFallback = tokensInEst;
   let providerContacted = false;
   let usageKnown = false;
   let tokensIn = 0;
@@ -174,17 +206,20 @@ export async function remoteCall<T>(db: Db, userId: string, purpose: string, sys
     });
     providerContacted = true;
     if (!res.ok) throw Object.assign(new Error(), { code: "provider_http_error" });
-    let json: { choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+    let json: { choices?: { message?: { content?: string } }[]; usage?: unknown };
     try {
       json = await res.json() as typeof json;
     } catch {
       throw Object.assign(new Error(), { code: "invalid_provider_json" });
     }
     const content = json.choices?.[0]?.message?.content ?? "";
-    tokensIn = json.usage?.prompt_tokens ?? tokensInFallback;
-    tokensOut = json.usage?.completion_tokens ?? Math.ceil(content.length / 4);
-    actualCost = estimateCost(tokensIn, tokensOut, reservation.config.ai);
-    usageKnown = true;
+    const reportedUsage = validProviderUsage(json.usage);
+    if (reportedUsage) {
+      tokensIn = reportedUsage.tokensIn;
+      tokensOut = reportedUsage.tokensOut;
+      actualCost = estimateCost(tokensIn, tokensOut, reservation.config.ai);
+      usageKnown = true;
+    }
     try {
       value = schema.parse(JSON.parse(content));
     } catch {
@@ -195,14 +230,18 @@ export async function remoteCall<T>(db: Db, userId: string, purpose: string, sys
       ? error.code
       : providerContacted ? "invalid_provider_json" : "transport_error";
     if (usageKnown) {
-      await logCall(db, userId, purpose, "remote", reservation.model, tokensIn, tokensOut, actualCost, `${purpose}: failed attempt`, { status: "failed", code }, today, reservation.id);
+      await logCall(db, userId, purpose, "remote", reservation.model, tokensIn, tokensOut, actualCost, "actual", `${purpose}: failed attempt`, { status: "failed", code }, today, reservation.id);
     } else {
       await markUncertain(db, userId, reservation.id, purpose, reservation.model, code, today);
     }
     return null;
   }
-  await logCall(db, userId, purpose, "remote", reservation.model, tokensIn, tokensOut, actualCost, requestSummary, { status: "succeeded" }, today, reservation.id);
-  return { value, cost: actualCost };
+  if (usageKnown) {
+    await logCall(db, userId, purpose, "remote", reservation.model, tokensIn, tokensOut, actualCost, "actual", requestSummary, { status: "succeeded" }, today, reservation.id);
+    return { value, cost: actualCost };
+  }
+  const reservedCost = await recordUnknownUsage(db, userId, reservation.id, purpose, reservation.model, today);
+  return { value, cost: reservedCost };
 }
 
 async function causeGroups(db: Db, userId: string, since: string) {
@@ -249,7 +288,7 @@ export async function weeklyReview(db: Db, userId: string, today: string, refres
   });
   const remote = await remoteCall(db, userId, "weekly_review", "You are a calm study coach. Reply ONLY with JSON matching {summary, patterns[], oneChange, errorGroups[{cause,count,concepts[],mission}]}. No names, no personal text.", JSON.stringify(summary), weeklyReviewSchema, today);
   const review = remote?.value ?? localWeeklyReview(summary, groups);
-  if (!remote) (await logCall(db, userId, "weekly_review", "local", "deterministic", 0, 0, 0, "weekly_review: local provider", review, today));
+  if (!remote) (await logCall(db, userId, "weekly_review", "local", "deterministic", 0, 0, 0, "estimated", "weekly_review: local provider", review, today));
   const out: WeeklyReviewResult = { week, provider: remote ? "remote" : "local", review, summary };
   (await setKv(db, userId, cacheKey, out));
   return out;
@@ -259,7 +298,7 @@ export async function errorAnalysis(db: Db, userId: string, today: string) {
   const groups = (await causeGroups(db, userId, addDaysIso(today, -28)));
   const remote = await remoteCall(db, userId, "error_analysis", "You are a study coach. Reply ONLY JSON {errorGroups:[{cause,count,concepts[],mission}]} — missions are one 25-min actionable step. No personal text.", JSON.stringify({ groups }), analysisSchema, today);
   const value = remote?.value ?? { errorGroups: groups.map((g) => ({ ...g, mission: `3 targeted tests on ${g.concepts[0] ?? g.cause}, then write the takeaway in one line.` })) };
-  if (!remote) (await logCall(db, userId, "error_analysis", "local", "deterministic", 0, 0, 0, "error_analysis: local provider", value, today));
+  if (!remote) (await logCall(db, userId, "error_analysis", "local", "deterministic", 0, 0, 0, "estimated", "error_analysis: local provider", value, today));
   return { provider: remote ? ("remote" as const) : ("local" as const), groups: value.errorGroups };
 }
 
@@ -270,7 +309,7 @@ export async function narrative(db: Db, userId: string, today: string) {
   const input = { chapterNo: Math.max(1, cleared + 1), cleared, total, weekNo: weekNoOf(today) };
   const remote = await remoteCall(db, userId, "narrative", "You are the narrator of a calm study campaign. Reply ONLY JSON {title,text}. Second person, hopeful, ≤ 900 chars. No personal data.", JSON.stringify(input), narrativeSchema, today);
   const value = remote?.value ?? localNarrative(input);
-  if (!remote) (await logCall(db, userId, "narrative", "local", "deterministic", 0, 0, 0, "narrative: local provider", value, today));
+  if (!remote) (await logCall(db, userId, "narrative", "local", "deterministic", 0, 0, 0, "estimated", "narrative: local provider", value, today));
   return { provider: remote ? ("remote" as const) : ("local" as const), ...value, flags: cfg.flags.ai };
 }
 
@@ -282,7 +321,7 @@ export async function anomalyAlerts(db: Db, userId: string, today: string) {
   const flags = { perfectAccuracy: has("perfect_accuracy"), overHours: has("focus_hours"), manualShare: has("manual_share"), testsFlood: has("tests_per_day") };
   const remote = await remoteCall(db, userId, "anomaly_alerts", "You are a gentle mirror, never a judge. Reply ONLY JSON {alerts:[{key,message,severity:info|warn}]}. No blame, no penalties, ≤ 240 chars each.", JSON.stringify(flags), anomalyAlertsSchema, today);
   const value = remote?.value ?? localAnomalies(flags);
-  if (!remote) (await logCall(db, userId, "anomaly_alerts", "local", "deterministic", 0, 0, 0, "anomaly_alerts: local provider", value, today));
+  if (!remote) (await logCall(db, userId, "anomaly_alerts", "local", "deterministic", 0, 0, 0, "estimated", "anomaly_alerts: local provider", value, today));
   return { enabled: true, provider: remote ? ("remote" as const) : ("local" as const), alerts: value.alerts, observed: raw.slice(0, 6) };
 }
 

@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { withUserTransaction, type Db } from "@/db/client";
 import { habits, reminders, users } from "@/db/schema";
 import { reminderText } from "@/domain/ai";
@@ -48,6 +48,7 @@ export async function ensureTodayReminders(db: Db, userId: string, today: string
     time: "09:00",
   }));
   const picked = [...studyAnchors, ...(await anchorsFor(tx, userId, cfg))].slice(0, cfg.reminders.maxPerDay);
+  // Dismissed rows still count toward the date's cap, so completing a review cannot free a new slot.
   const existing = await tx.select({ anchorKey: reminders.anchorKey }).from(reminders)
     .where(and(eq(reminders.userId, userId), eq(reminders.date, today)));
   const existingKeys = new Set(existing.map((reminder) => reminder.anchorKey));
@@ -73,7 +74,7 @@ export async function remindersView(db: Db, userId: string, today: string, now =
   const tz = (await tx.select({ tz: users.timezone }).from(users).where(eq(users.id, userId)).limit(1))[0]?.tz ?? "Asia/Tehran";
   const lp = localParts(now, tz);
   const nowLocal = `${lp.date}T${String(lp.hour).padStart(2, "0")}:${String(lp.minute).padStart(2, "0")}:00`;
-  const rows = (await tx.select().from(reminders).where(and(eq(reminders.userId, userId), eq(reminders.date, today))));
+  const rows = (await tx.select().from(reminders).where(and(eq(reminders.userId, userId), eq(reminders.date, today), isNull(reminders.dismissedAt))));
   const items = rows.map((r) => ({ ...r, due: r.dueAt <= nowLocal, read: !!r.readAt })).sort((a, b) => Number(a.read) - Number(b.read) || a.dueAt.localeCompare(b.dueAt));
   return { enabled: cfg.reminders.enabled, tone: cfg.reminders.tone, maxPerDay: cfg.reminders.maxPerDay, items, unread: items.filter((i) => !i.read && i.due).length };
 });
@@ -81,7 +82,7 @@ export async function remindersView(db: Db, userId: string, today: string, now =
 
 export async function markReminderRead(db: Db, userId: string, id: string, today: string) {
   return await withUserTransaction(db, userId, async (tx) => {
-  const r = (await tx.select().from(reminders).where(and(eq(reminders.id, id), eq(reminders.userId, userId))).limit(1))[0];
+  const r = (await tx.select().from(reminders).where(and(eq(reminders.id, id), eq(reminders.userId, userId), isNull(reminders.dismissedAt))).limit(1))[0];
   if (!r) throw new Error("Unknown reminder");
   if (!r.readAt) {
     (await tx.update(reminders).set({ readAt: nowIso() }).where(eq(reminders.id, id)));

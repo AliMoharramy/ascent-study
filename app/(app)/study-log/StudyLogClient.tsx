@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { STUDY_LOG_ANALYSIS_LEASE_MS } from "@/domain/studyLog";
 import { apiFetch, isAmbiguousMutationOutcome, requestId } from "@/ui/client";
 import { Chip, EmptyState, Eyebrow, cx } from "@/ui/components";
 import { Icon } from "@/ui/icons";
-import { createStableMutationAttempt, mutationAttemptBody, type StableMutationAttempt } from "@/ui/studyLogMutation";
+import { createStableMutationAttempt, mutationAttemptBody, restoreMutationAttempt, type StableMutationAttempt } from "@/ui/studyLogMutation";
+import { clearStudyLogRecoveryMarker, mergeStudyLogSummaries, processingStudyLogIds, readStudyLogRecoveryMarkers, saveStudyLogRecoveryMarker, type RecoveryStorage } from "@/ui/studyLogState";
 
 type LogStatus = "pending" | "processing" | "retryable" | "needs_material" | "no_sequence" | "scheduled";
 type ReviewStatus = "pending" | "done" | "skipped" | "canceled";
@@ -14,10 +15,38 @@ type Review = { id: string; checkpoint: number; offsetDays: number; front: strin
 type SummaryReview = Pick<Review, "id" | "checkpoint" | "offsetDays" | "scheduledOn" | "dueOn" | "status">;
 type Log = { id: string; userId: string; clientRequestId: string; topic: string; courseId: string | null; lessonId: string | null; chapterId: string | null; studiedOn: string; sourceText: string; status: LogStatus; decision: "schedule" | "no_sequence" | "needs_material" | null; reason: string; analysisStartedAt: string | null; createdAt: string; updatedAt: string };
 type Bundle = { log: Log; reviews: Review[] };
-type Summary = Pick<Log, "id" | "clientRequestId" | "topic" | "courseId" | "lessonId" | "chapterId" | "studiedOn" | "status" | "decision" | "reason" | "analysisStartedAt" | "createdAt"> & { reviews: SummaryReview[] };
+type Summary = Pick<Log, "id" | "clientRequestId" | "topic" | "courseId" | "lessonId" | "chapterId" | "studiedOn" | "status" | "decision" | "reason" | "analysisStartedAt" | "createdAt" | "updatedAt"> & { reviews: SummaryReview[] };
 type Course = { id: string; title: string; subjectId: string };
 type Lesson = { id: string; title: string; courseId: string; chapterIds: string[] };
 type Chapter = { id: string; no: number; title: string; subjectId: string };
+
+function recoveryStorage(): RecoveryStorage | null {
+  try {
+    return typeof window === "undefined" ? null : window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+function summaryFromBundle(bundle: Bundle): Summary {
+  const { log, reviews } = bundle;
+  return {
+    id: log.id,
+    clientRequestId: log.clientRequestId,
+    topic: log.topic,
+    courseId: log.courseId,
+    lessonId: log.lessonId,
+    chapterId: log.chapterId,
+    studiedOn: log.studiedOn,
+    status: log.status,
+    decision: log.decision,
+    reason: log.reason,
+    analysisStartedAt: log.analysisStartedAt,
+    createdAt: log.createdAt,
+    updatedAt: log.updatedAt,
+    reviews: reviews.map(({ id, checkpoint, offsetDays, scheduledOn, dueOn, status }) => ({ id, checkpoint, offsetDays, scheduledOn, dueOn, status })),
+  };
+}
 
 const offsets = [3, 7, 14, 30];
 const checkpointNames = ["first recall", "reinforce", "consolidate", "retain"];
@@ -47,7 +76,9 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
   const [chapterId, setChapterId] = useState("");
   const [busy, setBusy] = useState(false);
   const [pendingSubmission, setPendingSubmission] = useState<StableMutationAttempt<Record<string, unknown>> | null>(null);
+  const [pendingSubmissionId, setPendingSubmissionId] = useState<string | null>(null);
   const [pendingRetries, setPendingRetries] = useState<Record<string, StableMutationAttempt<Record<string, unknown>>>>({});
+  const [recoveredRetryIds, setRecoveredRetryIds] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [olderItems, setOlderItems] = useState<Summary[]>([]);
@@ -60,30 +91,137 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
   const [retrySource, setRetrySource] = useState<Record<string, string>>({});
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [historyNotice, setHistoryNotice] = useState("");
-  const [leaseClock, setLeaseClock] = useState(() => Date.now());
+  const [summaryUpdates, setSummaryUpdates] = useState<Summary[]>([]);
+  const pollOffset = useRef(0);
+  const pollInFlight = useRef(false);
+  const finalizedLeases = useRef(new Set<string>());
 
-  const recent = useMemo(() => [...p.recent, ...olderItems.filter((item) => !p.recent.some((current) => current.id === item.id))], [olderItems, p.recent]);
+  const recent = useMemo(() => mergeStudyLogSummaries(
+    [...p.recent, ...olderItems.filter((item) => !p.recent.some((current) => current.id === item.id))],
+    summaryUpdates,
+  ), [olderItems, p.recent, summaryUpdates]);
   useEffect(() => {
     setOlderItems([]);
     setNextCursor(p.nextCursor);
   }, [p.nextCursor, p.recent]);
   useEffect(() => {
-    const retryAt = recent
-      .filter((item) => item.status === "processing" && item.analysisStartedAt)
-      .map((item) => new Date(item.analysisStartedAt!).getTime() + STUDY_LOG_ANALYSIS_LEASE_MS)
-      .filter((at) => Number.isFinite(at) && at > Date.now())
+    const now = Date.now();
+    const processing = recent.filter((item) => item.status === "processing" && item.analysisStartedAt);
+    const activeIds = processingStudyLogIds(processing, now, 50, pollOffset.current);
+    const finalCandidates = processing.filter((item) => {
+      const startedAt = Date.parse(item.analysisStartedAt!);
+      const leaseKey = `${item.id}:${item.analysisStartedAt}`;
+      return Number.isFinite(startedAt) && startedAt + STUDY_LOG_ANALYSIS_LEASE_MS <= now && !finalizedLeases.current.has(leaseKey);
+    });
+    const candidates = [...new Set([...finalCandidates.map((item) => item.id), ...activeIds])];
+    if (candidates.length === 0) return;
+    const batch = candidates.slice(0, 50);
+    pollOffset.current = (pollOffset.current + batch.length) % Math.max(1, processing.length);
+    const nextExpiry = processing
+      .map((item) => Date.parse(item.analysisStartedAt!) + STUDY_LOG_ANALYSIS_LEASE_MS)
+      .filter((at) => Number.isFinite(at) && at > now)
       .sort((a, b) => a - b)[0];
-    if (!retryAt) return;
+    const wait = finalCandidates.length > 0 ? 0 : Math.min(5_000, nextExpiry ? Math.max(100, nextExpiry - now) : 5_000);
     const timer = setTimeout(() => {
-      setLeaseClock(Date.now());
-      if (selectedId && details[selectedId]?.log.status === "processing") {
-        void apiFetch<Bundle>(`/api/study-logs/${encodeURIComponent(selectedId)}`)
-          .then((result) => setDetails((current) => ({ ...current, [selectedId]: result })))
-          .catch(() => router.refresh());
+      if (pollInFlight.current) return;
+      pollInFlight.current = true;
+      for (const item of finalCandidates) {
+        if (batch.includes(item.id)) finalizedLeases.current.add(`${item.id}:${item.analysisStartedAt}`);
       }
-    }, Math.min(retryAt - Date.now() + 25, 2_147_000_000));
+      const requestIds = batch.map((id) => recent.find((item) => item.id === id)?.clientRequestId).filter((id): id is string => !!id);
+      if (requestIds.length === 0) {
+        pollInFlight.current = false;
+        return;
+      }
+      void apiFetch<{ studyLogs: Summary[] }>(`/api/study-logs?requestIds=${encodeURIComponent(requestIds.join(","))}`)
+        .then(async (result) => {
+          setSummaryUpdates((current) => mergeStudyLogSummaries(current, result.studyLogs));
+          const updatedSelected = result.studyLogs.find((item) => item.id === selectedId);
+          if (selectedId && updatedSelected && details[selectedId]?.log.status === "processing") {
+            const detail = await apiFetch<Bundle>(`/api/study-logs/${encodeURIComponent(selectedId)}`);
+            setDetails((current) => ({ ...current, [selectedId]: detail }));
+            setSummaryUpdates((current) => mergeStudyLogSummaries(current, [summaryFromBundle(detail)]));
+            if (detail.log.status !== "processing") router.refresh();
+          } else if (result.studyLogs.some((item) => item.status !== "processing")) {
+            router.refresh();
+          }
+        })
+        .catch(() => router.refresh())
+        .finally(() => { pollInFlight.current = false; });
+    }, wait);
     return () => clearTimeout(timer);
-  }, [leaseClock, recent, selectedId, details, router]);
+  }, [recent, selectedId, details, router]);
+
+  useEffect(() => {
+    const storage = recoveryStorage();
+    const markers = storage ? readStudyLogRecoveryMarkers(storage).filter((marker) => marker.kind === "submission" || marker.kind === "retry") : [];
+    if (!storage || markers.length === 0) return;
+    let cancelled = false;
+    const requestIds = markers.map((marker) => marker.clientRequestId);
+    void apiFetch<{ studyLogs: Summary[]; acceptedRequestIds: string[] }>(`/api/study-logs?requestIds=${encodeURIComponent(requestIds.join(","))}`)
+      .then(async (reconciled) => {
+        if (cancelled) return;
+        setSummaryUpdates((current) => mergeStudyLogSummaries(current, reconciled.studyLogs));
+        for (const marker of markers) {
+          if (marker.kind === "submission") {
+            const saved = reconciled.studyLogs.find((item) => item.clientRequestId === marker.clientRequestId);
+            if (!saved) {
+              setPendingSubmissionId(marker.clientRequestId);
+              setNotice("A previous save has no matching server record yet. Re-enter the exact same study details to retry with its saved request ID; study text is not stored in browser recovery state.");
+              continue;
+            }
+            clearStudyLogRecoveryMarker(storage, marker.clientRequestId);
+            setPendingSubmissionId(null);
+            try {
+              const fresh = await apiFetch<Bundle>(`/api/study-logs/${encodeURIComponent(saved.id)}`);
+              if (cancelled) return;
+              setDetails((current) => ({ ...current, [fresh.log.id]: fresh }));
+              setSelectedId(fresh.log.id);
+              setRetrySource((current) => ({ ...current, [fresh.log.id]: fresh.log.sourceText }));
+              setSummaryUpdates((current) => mergeStudyLogSummaries(current, [summaryFromBundle(fresh)]));
+              setNotice(statusPresentation[fresh.log.status].createNotice);
+            } catch {
+              // The summary confirms the save; details can be reopened when the network is available.
+            }
+          } else if (reconciled.acceptedRequestIds.includes(marker.clientRequestId)) {
+            clearStudyLogRecoveryMarker(storage, marker.clientRequestId);
+            setRecoveredRetryIds((current) => { const next = { ...current }; delete next[marker.studyLogId]; return next; });
+            try {
+              const fresh = await apiFetch<Bundle>(`/api/study-logs/${encodeURIComponent(marker.studyLogId)}`);
+              if (cancelled) return;
+              setDetails((current) => ({ ...current, [fresh.log.id]: fresh }));
+              setRetrySource((current) => ({ ...current, [fresh.log.id]: fresh.log.sourceText }));
+              setSummaryUpdates((current) => mergeStudyLogSummaries(current, [summaryFromBundle(fresh)]));
+            } catch {
+              // The accepted event is authoritative; the detail panel can re-fetch on open.
+            }
+          } else {
+            setRecoveredRetryIds((current) => ({ ...current, [marker.studyLogId]: marker.clientRequestId }));
+            setNotice("A previous analysis retry is not confirmed. Open its study log, re-enter the intended notes, and retry with the saved request ID. Browser recovery keeps no note text.");
+            try {
+              const fresh = await apiFetch<Bundle>(`/api/study-logs/${encodeURIComponent(marker.studyLogId)}`);
+              if (cancelled) return;
+              setDetails((current) => ({ ...current, [fresh.log.id]: fresh }));
+              setSelectedId(fresh.log.id);
+              setRetrySource((current) => ({ ...current, [fresh.log.id]: fresh.log.sourceText }));
+              setSummaryUpdates((current) => mergeStudyLogSummaries(current, [summaryFromBundle(fresh)]));
+            } catch {
+              // Keep the request identity and let the user retry detail loading later.
+            }
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          for (const marker of markers) {
+            if (marker.kind === "submission") setPendingSubmissionId(marker.clientRequestId);
+            else setRecoveredRetryIds((current) => ({ ...current, [marker.studyLogId]: marker.clientRequestId }));
+          }
+          setNotice("A previous study-log request is still unconfirmed. Its request ID remains in this tab so it can be reconciled when the server is reachable.");
+        }
+      });
+    return () => { cancelled = true; };
+  }, []);
   const selectedCourse = p.courses.find((course) => course.id === courseId);
   const selectedLesson = p.lessons.find((lesson) => lesson.id === lessonId);
   const availableLessons = p.lessons.filter((lesson) => !courseId || lesson.courseId === courseId);
@@ -108,14 +246,21 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
       ...(chapterId ? { chapterId } : {}),
       consentToRemoteAi: true,
     };
-    const attempt = createStableMutationAttempt(pendingSubmission, payload, requestId);
+    const attempt = pendingSubmission
+      ?? (pendingSubmissionId ? restoreMutationAttempt(pendingSubmissionId, payload) : createStableMutationAttempt(null, payload, requestId));
     setPendingSubmission(attempt);
+    const storage = recoveryStorage();
+    if (storage) saveStudyLogRecoveryMarker(storage, { kind: "submission", clientRequestId: attempt.clientRequestId });
     try {
       const result = await apiFetch<Bundle>("/api/study-logs", {
         body: mutationAttemptBody(attempt),
       });
+      const storage = recoveryStorage();
+      if (storage) clearStudyLogRecoveryMarker(storage, attempt.clientRequestId);
       setPendingSubmission(null);
+      setPendingSubmissionId(null);
       setDetails((current) => ({ ...current, [result.log.id]: result }));
+      setSummaryUpdates((current) => mergeStudyLogSummaries(current, [summaryFromBundle(result)]));
       setSelectedId(result.log.id);
       setNotice(statusPresentation[result.log.status].createNotice);
       setTopic("");
@@ -128,20 +273,29 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
       router.refresh();
     } catch (cause) {
       const ambiguous = isAmbiguousMutationOutcome(cause);
-      if (!ambiguous) setPendingSubmission(null);
+      if (!ambiguous) {
+        const storage = recoveryStorage();
+        if (storage) clearStudyLogRecoveryMarker(storage, attempt.clientRequestId);
+        setPendingSubmission(null);
+        setPendingSubmissionId(null);
+      }
       setError(ambiguous
         ? "The connection ended before the save was confirmed. The server may already have saved it; submit again to replay this same request safely."
         : cause instanceof Error ? cause.message : "Study log could not be saved.");
       if (ambiguous) {
         try {
-          const page = await apiFetch<{ studyLogs: Summary[] }>("/api/study-logs?limit=50");
+          const page = await apiFetch<{ studyLogs: Summary[] }>(`/api/study-logs?requestIds=${encodeURIComponent(attempt.clientRequestId)}`);
           const saved = page.studyLogs.find((item) => item.clientRequestId === attempt.clientRequestId);
           if (saved) {
             const fresh = await apiFetch<Bundle>(`/api/study-logs/${encodeURIComponent(saved.id)}`);
+            const storage = recoveryStorage();
+            if (storage) clearStudyLogRecoveryMarker(storage, attempt.clientRequestId);
             setDetails((current) => ({ ...current, [fresh.log.id]: fresh }));
+            setSummaryUpdates((current) => mergeStudyLogSummaries(current, [summaryFromBundle(fresh)]));
             setSelectedId(fresh.log.id);
             setRetrySource((current) => ({ ...current, [fresh.log.id]: fresh.log.sourceText }));
             setPendingSubmission(null);
+            setPendingSubmissionId(null);
             setError("");
             setNotice(statusPresentation[fresh.log.status].createNotice);
             setTopic("");
@@ -174,6 +328,7 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
     try {
       const result = await apiFetch<Bundle>(`/api/study-logs/${encodeURIComponent(id)}`);
       setDetails((current) => ({ ...current, [id]: result }));
+      setSummaryUpdates((current) => mergeStudyLogSummaries(current, [summaryFromBundle(result)]));
       setRetrySource((current) => ({ ...current, [id]: result.log.sourceText }));
     } catch (cause) {
       setDetailError(cause instanceof Error ? cause.message : "This study log could not be loaded.");
@@ -184,7 +339,11 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
 
   async function retry(id: string) {
     const source = retrySource[id] ?? details[id]?.log.sourceText ?? "";
-    const attempt = createStableMutationAttempt(pendingRetries[id] ?? null, { sourceText: source, consentToRemoteAi: true }, requestId);
+    const payload = { sourceText: source, consentToRemoteAi: true };
+    const attempt = pendingRetries[id]
+      ?? (recoveredRetryIds[id] ? restoreMutationAttempt(recoveredRetryIds[id]!, payload) : createStableMutationAttempt(null, payload, requestId));
+    const storage = recoveryStorage();
+    if (storage) saveStudyLogRecoveryMarker(storage, { kind: "retry", clientRequestId: attempt.clientRequestId, studyLogId: id });
     setPendingRetries((current) => ({ ...current, [id]: attempt }));
     setRetryingId(id);
     setDetailError("");
@@ -193,18 +352,33 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
       const result = await apiFetch<Bundle>(`/api/study-logs/${encodeURIComponent(id)}/retry`, {
         body: mutationAttemptBody(attempt),
       });
+      if (storage) clearStudyLogRecoveryMarker(storage, attempt.clientRequestId);
+      setRecoveredRetryIds((current) => { const next = { ...current }; delete next[id]; return next; });
       setPendingRetries((current) => { const next = { ...current }; delete next[id]; return next; });
       setDetails((current) => ({ ...current, [id]: result }));
+      setSummaryUpdates((current) => mergeStudyLogSummaries(current, [summaryFromBundle(result)]));
       setRetrySource((current) => ({ ...current, [id]: result.log.sourceText }));
       setHistoryNotice(statusPresentation[result.log.status].retryNotice);
       router.refresh();
     } catch (cause) {
       const ambiguous = isAmbiguousMutationOutcome(cause);
-      if (!ambiguous) setPendingRetries((current) => { const next = { ...current }; delete next[id]; return next; });
+      if (!ambiguous) {
+        if (storage) clearStudyLogRecoveryMarker(storage, attempt.clientRequestId);
+        setRecoveredRetryIds((current) => { const next = { ...current }; delete next[id]; return next; });
+        setPendingRetries((current) => { const next = { ...current }; delete next[id]; return next; });
+      }
       setDetailError(ambiguous
         ? "The server may have accepted this analysis retry, but its result was not confirmed. Retry delivery to replay the same notes and request key."
         : cause instanceof Error ? cause.message : "The review plan could not be retried.");
-      void apiFetch<Bundle>(`/api/study-logs/${encodeURIComponent(id)}`).then((fresh) => setDetails((current) => ({ ...current, [id]: fresh }))).catch(() => router.refresh());
+      void apiFetch<Bundle>(`/api/study-logs/${encodeURIComponent(id)}`).then((fresh) => {
+        setDetails((current) => ({ ...current, [id]: fresh }));
+        setSummaryUpdates((current) => mergeStudyLogSummaries(current, [summaryFromBundle(fresh)]));
+        if (fresh.log.status !== "processing") {
+          if (storage) clearStudyLogRecoveryMarker(storage, attempt.clientRequestId);
+          setPendingRetries((current) => { const next = { ...current }; delete next[id]; return next; });
+          setRecoveredRetryIds((current) => { const next = { ...current }; delete next[id]; return next; });
+        }
+      }).catch(() => router.refresh());
     } finally {
       setRetryingId(null);
     }
@@ -313,11 +487,12 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
             {error && <p role="alert" className="rounded-2xl border border-coral/50 bg-coral/10 px-4 py-3 text-body-s font-bold text-coral-ink">{error}</p>}
             {notice && <p role="status" className="rounded-2xl border border-mint/40 bg-mint/10 px-4 py-3 text-body-s font-bold text-mint-ink">{notice}</p>}
             {pendingSubmission && <p role="status" className="rounded-2xl border border-yellow/40 bg-yellow/10 px-4 py-3 text-body-s text-muted">Delivery is unconfirmed. The form is locked so retrying keeps the original study details and request key.</p>}
+            {pendingSubmissionId && !pendingSubmission && <p role="status" className="rounded-2xl border border-yellow/40 bg-yellow/10 px-4 py-3 text-body-s text-muted">The previous request ID was restored, but study text was not saved in browser storage. Re-enter the exact same details before retrying; the server will reject a changed payload.</p>}
             </fieldset>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
               <p className="max-w-md text-caption text-muted">Questions are saved only when all four can be grounded in your notes.</p>
               <button className="btn-accent min-w-40 justify-center" disabled={busy || topic.trim().length < 2 || !sourceText.trim() || !consentToRemoteAi}>
-                <Icon name={busy ? "clock" : "arrow"} size={16} /> {busy ? "Building review path…" : pendingSubmission ? "Retry same submission" : "Save study log"}
+                <Icon name={busy ? "clock" : "arrow"} size={16} /> {busy ? "Building review path…" : pendingSubmission ? "Retry same submission" : pendingSubmissionId ? "Retry saved request ID" : "Save study log"}
               </button>
             </div>
           </form>
@@ -361,6 +536,7 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
                         retrySource={retrySource[item.id] ?? details[item.id]!.log.sourceText}
                         onSourceChange={(value) => setRetrySource((current) => ({ ...current, [item.id]: value }))}
                         retryPending={!!pendingRetries[item.id]}
+                        retryRecovery={!!recoveredRetryIds[item.id]}
                         key={item.id}
                         onRetry={() => retry(item.id)}
                         retrying={retryingId === item.id}
@@ -380,7 +556,7 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
   );
 }
 
-function LogDetail(p: { bundle: Bundle; retrySource: string; onSourceChange: (value: string) => void; retryPending: boolean; onRetry: () => Promise<void>; retrying: boolean }) {
+function LogDetail(p: { bundle: Bundle; retrySource: string; onSourceChange: (value: string) => void; retryPending: boolean; retryRecovery: boolean; onRetry: () => Promise<void>; retrying: boolean }) {
   const { log, reviews } = p.bundle;
   const leaseExpired = !log.analysisStartedAt || !Number.isFinite(Date.parse(log.analysisStartedAt)) || Date.now() - Date.parse(log.analysisStartedAt) >= STUDY_LOG_ANALYSIS_LEASE_MS;
   const canRetry = log.status === "retryable" || log.status === "needs_material" || (log.status === "processing" && leaseExpired);
@@ -401,6 +577,7 @@ function LogDetail(p: { bundle: Bundle; retrySource: string; onSourceChange: (va
       </div>
       {log.reason && <p className="text-body-s text-muted">{log.reason}</p>}
       {log.status === "processing" && !canRetry && <p role="status" className="text-caption text-muted">An analysis attempt is still active. Retry becomes available after its five-minute lease expires.</p>}
+      {p.retryRecovery && <p role="status" className="rounded-xl border border-yellow/40 bg-yellow/10 p-3 text-caption text-muted">The retry ID survived this reload; its edited notes did not. Re-enter the exact notes from the unconfirmed attempt and confirm consent to replay safely.</p>}
 
       {reviews.length > 0 && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Scheduled review dates">
@@ -433,7 +610,7 @@ function LogDetail(p: { bundle: Bundle; retrySource: string; onSourceChange: (va
           <div className="flex items-center justify-between gap-2">
             <span className="font-mono text-caption text-muted">{p.retrySource.length.toLocaleString()} / 20,000</span>
             <button type="button" className="btn-accent" disabled={p.retrying || (!p.retryPending && (!p.retrySource.trim() || !retryConsent))} onClick={() => void retryWithConsent()}>
-              <Icon name={p.retrying ? "clock" : "arrow"} size={15} /> {p.retrying ? "Retrying…" : p.retryPending ? "Retry delivery" : "Retry review plan"}
+              <Icon name={p.retrying ? "clock" : "arrow"} size={15} /> {p.retrying ? "Retrying…" : p.retryPending ? "Retry delivery" : p.retryRecovery ? "Retry with saved ID" : "Retry review plan"}
             </button>
           </div>
         </div>

@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, getTableColumns, inArray, lt, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray, isNull, lt, lte, or } from "drizzle-orm";
 import { createHash } from "node:crypto";
+import { z } from "zod";
 import { withUserTransaction, type Db } from "@/db/client";
-import { chapters, courses, lessonChapters, lessons, reminders, studyLogReviews, studyLogs } from "@/db/schema";
+import { chapters, courses, events, lessonChapters, lessons, reminders, studyLogReviews, studyLogs } from "@/db/schema";
 import { studyLogDecisionSchema, studyLogSubmissionSchema, studyLogRetrySchema, validateStudyLogDecision, reviewDatesForStudyDay, isoGameDaySchema, STUDY_LOG_ANALYSIS_LEASE_MS } from "@/domain/studyLog";
 import { appendEvent, EventRequestConflict, replayOf } from "@/events/store";
 import { newId, nowIso } from "@/lib/ids";
@@ -353,6 +354,57 @@ export async function listStudyLogs(db: Db, userId: string, options: { limit?: n
   return { items, nextCursor: hasMore ? encodeHistoryCursor({ createdAt: last.createdAt, id: last.id }) : null };
 }
 
+/** Returns source-free log summaries plus whether retry/review mutation IDs already committed. */
+export async function reconcileStudyLogMutations(db: Db, userId: string, requestIds: string[]): Promise<{ studyLogs: StudyLogSummaryBundle[]; acceptedRequestIds: string[] }> {
+  const ids = [...new Set(z.array(z.string().min(1).max(80)).max(50).parse(requestIds))];
+  if (ids.length === 0) return { studyLogs: [], acceptedRequestIds: [] };
+  const logs = await db.select({
+    id: studyLogs.id,
+    userId: studyLogs.userId,
+    clientRequestId: studyLogs.clientRequestId,
+    topic: studyLogs.topic,
+    courseId: studyLogs.courseId,
+    lessonId: studyLogs.lessonId,
+    chapterId: studyLogs.chapterId,
+    studiedOn: studyLogs.studiedOn,
+    status: studyLogs.status,
+    decision: studyLogs.decision,
+    reason: studyLogs.reason,
+    analysisStartedAt: studyLogs.analysisStartedAt,
+    aiConsentAt: studyLogs.aiConsentAt,
+    createdAt: studyLogs.createdAt,
+    updatedAt: studyLogs.updatedAt,
+  }).from(studyLogs)
+    .where(and(eq(studyLogs.userId, userId), inArray(studyLogs.clientRequestId, ids)))
+    .orderBy(desc(studyLogs.createdAt), desc(studyLogs.id));
+  const logIds = logs.map((log) => log.id);
+  const reviews = logIds.length
+    ? await db.select({
+      id: studyLogReviews.id,
+      studyLogId: studyLogReviews.studyLogId,
+      checkpoint: studyLogReviews.checkpoint,
+      offsetDays: studyLogReviews.offsetDays,
+      scheduledOn: studyLogReviews.scheduledOn,
+      dueOn: studyLogReviews.dueOn,
+      status: studyLogReviews.status,
+    }).from(studyLogReviews)
+      .where(and(eq(studyLogReviews.userId, userId), inArray(studyLogReviews.studyLogId, logIds)))
+      .orderBy(asc(studyLogReviews.checkpoint))
+    : [];
+  const reviewsByLog = new Map<string, StudyReviewSummaryRow[]>();
+  for (const review of reviews) reviewsByLog.set(review.studyLogId, [...(reviewsByLog.get(review.studyLogId) ?? []), review]);
+  const accepted = await db.select({ clientRequestId: events.clientRequestId }).from(events)
+    .where(and(
+      eq(events.userId, userId),
+      inArray(events.clientRequestId, ids),
+      inArray(events.type, ["study_log.retry_requested", "study_log.review_acted"]),
+    ));
+  return {
+    studyLogs: logs.map((log) => ({ log, reviews: reviewsByLog.get(log.id) ?? [] })),
+    acceptedRequestIds: [...new Set(accepted.flatMap((row) => row.clientRequestId ? [row.clientRequestId] : []))],
+  };
+}
+
 export async function dueStudyLogReviews(db: Db, userId: string, today: string): Promise<DueStudyLogReview[]> {
   const dueDay = isoGameDaySchema.parse(today);
   return await db.select({ ...getTableColumns(studyLogReviews), topic: studyLogs.topic })
@@ -364,24 +416,21 @@ export async function dueStudyLogReviews(db: Db, userId: string, today: string):
 
 export async function actOnStudyLogReview(db: Db, userId: string, reviewId: string, input: StudyReviewActionInput, today: string): Promise<ReviewRow> {
   const day = isoGameDaySchema.parse(today);
+  const newDue = input.action === "snooze" ? isoGameDaySchema.parse(input.dueOn) : null;
   const request = {
     reviewId,
     action: input.action,
-    ...(input.action === "snooze" ? { dueOn: isoGameDaySchema.parse(input.dueOn) } : {}),
+    ...(newDue ? { dueOn: newDue } : {}),
   };
-  if (input.action === "snooze") {
-    const newDue = isoGameDaySchema.parse(input.dueOn);
-    if (newDue <= day) throw new StudyLogConflict("A snoozed review must be due on a future game day");
-  }
 
   return await withUserTransaction(db, userId, async (tx) => {
     const prior = await replayOf(tx, userId, "study_log.review_acted", input.clientRequestId, request);
     if (prior) {
-      await tx.delete(reminders).where(and(eq(reminders.userId, userId), eq(reminders.anchorKey, `study-review:${reviewId}`)));
       const previous = prior.payload.result;
       if (!previous || typeof previous !== "object") throw new EventRequestConflict();
       return previous as ReviewRow;
     }
+    if (newDue && newDue <= day) throw new StudyLogConflict("A snoozed review must be due on a future game day");
     const review = (await tx.select().from(studyLogReviews).where(and(eq(studyLogReviews.id, reviewId), eq(studyLogReviews.userId, userId))).limit(1))[0];
     if (!review) throw new StudyLogNotFound();
     if (review.status !== "pending") {
@@ -390,7 +439,6 @@ export async function actOnStudyLogReview(db: Db, userId: string, reviewId: stri
           : input.action === "cancel" ? review.status === "canceled"
             : false;
       if (repeatedAction) {
-        await tx.delete(reminders).where(and(eq(reminders.userId, userId), eq(reminders.anchorKey, `study-review:${reviewId}`)));
         await appendEvent(tx, {
           userId,
           type: "study_log.review_acted",
@@ -402,8 +450,7 @@ export async function actOnStudyLogReview(db: Db, userId: string, reviewId: stri
       }
       throw new StudyLogConflict("This review has already been resolved");
     }
-    if (input.action === "snooze" && review.dueOn === input.dueOn) {
-      await tx.delete(reminders).where(and(eq(reminders.userId, userId), eq(reminders.anchorKey, `study-review:${reviewId}`)));
+    if (input.action === "snooze" && review.dueOn === newDue) {
       await appendEvent(tx, {
         userId,
         type: "study_log.review_acted",
@@ -417,12 +464,16 @@ export async function actOnStudyLogReview(db: Db, userId: string, reviewId: stri
     const status = input.action === "complete" ? "done" : input.action === "skip" ? "skipped" : input.action === "cancel" ? "canceled" : "pending";
     const updated = (await tx.update(studyLogReviews).set({
       status,
-      dueOn: input.action === "snooze" ? input.dueOn! : review.dueOn,
+      dueOn: input.action === "snooze" ? newDue! : review.dueOn,
       doneOn: input.action === "complete" ? day : null,
       updatedAt: at,
     }).where(and(eq(studyLogReviews.id, reviewId), eq(studyLogReviews.userId, userId), eq(studyLogReviews.status, "pending"))).returning())[0];
     if (!updated) throw new StudyLogConflict("This review has already been resolved");
-    await tx.delete(reminders).where(and(eq(reminders.userId, userId), eq(reminders.anchorKey, `study-review:${reviewId}`)));
+    await tx.update(reminders).set({ dismissedAt: at }).where(and(
+      eq(reminders.userId, userId),
+      eq(reminders.anchorKey, `study-review:${reviewId}`),
+      isNull(reminders.dismissedAt),
+    ));
     await appendEvent(tx, {
       userId,
       type: "study_log.review_acted",

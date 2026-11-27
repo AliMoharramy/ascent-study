@@ -44,6 +44,7 @@ export default async function StudyLogPage() {
     reason: log.reason,
     analysisStartedAt: log.analysisStartedAt,
     createdAt: log.createdAt,
+    updatedAt: log.updatedAt,
     reviews: reviews.map(({ id, checkpoint, offsetDays, scheduledOn, dueOn, status }) => ({ id, checkpoint, offsetDays, scheduledOn, dueOn, status })),
   }));
 

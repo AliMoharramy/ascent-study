@@ -167,6 +167,34 @@ describe("PostgreSQL study-log lifecycle", () => {
     expect(replay).toEqual(first);
   });
 
+  it("replays all review actions across rollover, including snooze on and after its original due date", async () => {
+    const result = await studyLogService.submitStudyLog(fixture.db, userId, input("study-action-rollover-all-001"), today, evaluator(schedule()));
+    const [complete, snooze, skip, cancel] = result.reviews;
+    const requests = [
+      { review: complete!, input: reviewAction("complete", "review-rollover-complete-001"), firstReplayDay: "2026-11-15" },
+      { review: snooze!, input: reviewAction("snooze", "review-rollover-snooze-001", "2026-11-16"), firstReplayDay: "2026-11-16" },
+      { review: skip!, input: reviewAction("skip", "review-rollover-skip-001"), firstReplayDay: "2026-11-15" },
+      { review: cancel!, input: reviewAction("cancel", "review-rollover-cancel-001"), firstReplayDay: "2026-11-15" },
+    ] as const;
+
+    for (const item of requests) {
+      const committed = await studyLogService.actOnStudyLogReview(fixture.db, userId, item.review.id, item.input, today);
+      const replay = await studyLogService.actOnStudyLogReview(fixture.db, userId, item.review.id, item.input, item.firstReplayDay);
+      expect(replay).toEqual(committed);
+      if (item.input.action === "snooze") {
+        expect(await studyLogService.actOnStudyLogReview(fixture.db, userId, item.review.id, item.input, "2026-11-17")).toEqual(committed);
+      }
+    }
+
+    await expect(studyLogService.actOnStudyLogReview(
+      fixture.db,
+      userId,
+      result.reviews[0]!.id,
+      reviewAction("snooze", "review-rollover-new-invalid-001", "2026-11-14"),
+      "2026-11-14",
+    )).rejects.toBeInstanceOf(studyLogService.StudyLogConflict);
+  });
+
   it("returns bounded deterministic history pages without source text", async () => {
     const createdAt = "2026-11-14T10:00:00.000Z";
     await fixture.db.insert(studyLogs).values(Array.from({ length: 7 }, (_, index) => ({
@@ -229,6 +257,31 @@ describe("PostgreSQL study-log lifecycle", () => {
     expect(page.items).toHaveLength(50);
     expect(page.nextCursor).toBeTruthy();
     expect(page.items.every(({ log }) => !("sourceText" in log))).toBe(true);
+  });
+
+  it("reconciles pending browser request IDs through private-free summaries and accepted events", async () => {
+    const submitted = await studyLogService.submitStudyLog(fixture.db, userId, input("reconcile-submit-001"), today, evaluator(schedule()));
+    const failed = await studyLogService.submitStudyLog(fixture.db, userId, input("reconcile-retry-log-001"), today, evaluator(null));
+    await studyLogService.retryStudyLog(fixture.db, userId, failed.log.id, retryInput("reconcile-retry-action-001"), today, evaluator(null));
+    await studyLogService.actOnStudyLogReview(
+      fixture.db,
+      userId,
+      submitted.reviews[0]!.id,
+      reviewAction("complete", "reconcile-review-action-001"),
+      today,
+    );
+
+    const result = await studyLogService.reconcileStudyLogMutations(fixture.db, userId, [
+      "reconcile-submit-001",
+      "reconcile-retry-log-001",
+      "reconcile-retry-action-001",
+      "reconcile-review-action-001",
+      "missing-request-001",
+    ]);
+
+    expect(result.studyLogs.map(({ log }) => log.clientRequestId).sort()).toEqual(["reconcile-retry-log-001", "reconcile-submit-001"]);
+    expect(result.studyLogs.every(({ log }) => !("sourceText" in log))).toBe(true);
+    expect(result.acceptedRequestIds.sort()).toEqual(["reconcile-retry-action-001", "reconcile-review-action-001"]);
   });
 
   it("claims a concurrent request only once", async () => {

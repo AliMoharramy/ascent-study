@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createStableMutationAttempt, mutationAttemptBody } from "./studyLogMutation";
+import { createStableMutationAttempt, mutationAttemptBody, restoreMutationAttempt } from "./studyLogMutation";
 
 describe("study-log mutation attempts", () => {
   it("keeps the original identity and payload when the transport outcome is ambiguous", () => {
@@ -21,5 +21,14 @@ describe("study-log mutation attempts", () => {
 
     expect(mutationAttemptBody(first).clientRequestId).toBe("request-key-0001");
     expect(mutationAttemptBody(next).clientRequestId).toBe("request-key-0002");
+  });
+
+  it("restores a mutation ID after reload without requiring browser storage to retain its private payload", () => {
+    const recovered = restoreMutationAttempt("request-key-recovered", { sourceText: "re-entered by the user" });
+
+    expect(mutationAttemptBody(recovered)).toEqual({
+      sourceText: "re-entered by the user",
+      clientRequestId: "request-key-recovered",
+    });
   });
 });

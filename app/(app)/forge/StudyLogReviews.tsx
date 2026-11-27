@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { addDaysIso } from "@/i18n/jalali";
 import { apiFetch, isAmbiguousMutationOutcome, requestId } from "@/ui/client";
 import { EmptyState, Eyebrow, cx } from "@/ui/components";
 import { useFeedback } from "@/ui/feedback";
 import { Icon } from "@/ui/icons";
 import { useRouter } from "next/navigation";
-import { createStableMutationAttempt, mutationAttemptBody, type StableMutationAttempt } from "@/ui/studyLogMutation";
+import { createStableMutationAttempt, mutationAttemptBody, restoreMutationAttempt, type StableMutationAttempt } from "@/ui/studyLogMutation";
+import { clearStudyLogRecoveryMarker, readStudyLogRecoveryMarkers, saveStudyLogRecoveryMarker, type RecoveryStorage } from "@/ui/studyLogState";
 
 type DueReview = {
   id: string;
@@ -22,6 +23,14 @@ type DueReview = {
   topic: string;
 };
 
+function recoveryStorage(): RecoveryStorage | null {
+  try {
+    return typeof window === "undefined" ? null : window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 export function StudyLogReviews({ due, today }: { due: DueReview[]; today: string }) {
   const router = useRouter();
   const { toast } = useFeedback();
@@ -32,18 +41,76 @@ export function StudyLogReviews({ due, today }: { due: DueReview[]; today: strin
   const [error, setError] = useState("");
   const nextGameDay = addDaysIso(today, 1);
 
+  useEffect(() => {
+    const storage = recoveryStorage();
+    const markers = storage ? readStudyLogRecoveryMarkers(storage).filter((marker) => marker.kind === "review") : [];
+    if (!storage || markers.length === 0) return;
+    let cancelled = false;
+    setPendingActions((current) => {
+      const next = { ...current };
+      for (const marker of markers) {
+        if (marker.kind !== "review") continue;
+        const body = { action: marker.action, ...(marker.action === "snooze" ? { dueOn: marker.dueOn } : {}) };
+        next[marker.reviewId] = restoreMutationAttempt(marker.clientRequestId, body);
+      }
+      return next;
+    });
+    void apiFetch<{ acceptedRequestIds: string[] }>(`/api/study-logs?requestIds=${encodeURIComponent(markers.map((marker) => marker.clientRequestId).join(","))}`)
+      .then(async ({ acceptedRequestIds }) => {
+        if (cancelled) return;
+        for (const marker of markers) {
+          if (marker.kind !== "review") continue;
+          const body = {
+            action: marker.action,
+            ...(marker.action === "snooze" ? { dueOn: marker.dueOn } : {}),
+          };
+          if (acceptedRequestIds.includes(marker.clientRequestId)) {
+            clearStudyLogRecoveryMarker(storage, marker.clientRequestId);
+            setPendingActions((current) => { const next = { ...current }; delete next[marker.reviewId]; return next; });
+            continue;
+          }
+          try {
+            await apiFetch(`/api/study-log-reviews/${encodeURIComponent(marker.reviewId)}`, {
+              body: { ...body, clientRequestId: marker.clientRequestId },
+            });
+            clearStudyLogRecoveryMarker(storage, marker.clientRequestId);
+            setPendingActions((current) => { const next = { ...current }; delete next[marker.reviewId]; return next; });
+            router.refresh();
+          } catch (cause) {
+            if (!isAmbiguousMutationOutcome(cause)) {
+              clearStudyLogRecoveryMarker(storage, marker.clientRequestId);
+              setPendingActions((current) => { const next = { ...current }; delete next[marker.reviewId]; return next; });
+            }
+            setError(isAmbiguousMutationOutcome(cause)
+              ? "A previous review action is still unconfirmed. Retry keeps its saved request ID and action."
+              : cause instanceof Error ? cause.message : "This review could not be recovered.");
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setError("A previous review action is still unconfirmed. Its ID and action are kept in this tab until the server can reconcile it.");
+      });
+    return () => { cancelled = true; };
+  }, [router]);
+
   async function sendAttempt(review: DueReview, attempt: StableMutationAttempt<Record<string, unknown>>) {
     setBusyId(review.id);
     setError("");
     try {
       await apiFetch(`/api/study-log-reviews/${encodeURIComponent(review.id)}`, { body: mutationAttemptBody(attempt) });
+      const storage = recoveryStorage();
+      if (storage) clearStudyLogRecoveryMarker(storage, attempt.clientRequestId);
       setPendingActions((current) => { const next = { ...current }; delete next[review.id]; return next; });
       const action = attempt.body.action as "complete" | "skip" | "cancel" | "snooze";
       toast(action === "complete" ? "Study review completed" : action === "snooze" ? "Study review rescheduled" : action === "skip" ? "Study review skipped" : "Study review canceled");
       router.refresh();
     } catch (cause) {
       const ambiguous = isAmbiguousMutationOutcome(cause);
-      if (!ambiguous) setPendingActions((current) => { const next = { ...current }; delete next[review.id]; return next; });
+      if (!ambiguous) {
+        const storage = recoveryStorage();
+        if (storage) clearStudyLogRecoveryMarker(storage, attempt.clientRequestId);
+        setPendingActions((current) => { const next = { ...current }; delete next[review.id]; return next; });
+      }
       setError(ambiguous
         ? "The server may have applied this review action, but the response was not confirmed. Retry delivery to safely replay the same action."
         : cause instanceof Error ? cause.message : "This review could not be updated.");
@@ -59,6 +126,14 @@ export function StudyLogReviews({ due, today }: { due: DueReview[]; today: strin
       ? { action, dueOn: newDueOn[review.id] ?? nextGameDay }
       : { action };
     const attempt = createStableMutationAttempt(null, payload, requestId);
+    const storage = recoveryStorage();
+    if (storage) saveStudyLogRecoveryMarker(storage, {
+      kind: "review",
+      clientRequestId: attempt.clientRequestId,
+      reviewId: review.id,
+      action,
+      ...(action === "snooze" ? { dueOn: payload.dueOn as string } : {}),
+    });
     setPendingActions((current) => ({ ...current, [review.id]: attempt }));
     void sendAttempt(review, attempt);
   }
