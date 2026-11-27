@@ -26,6 +26,15 @@ export const studyLogSubmissionSchema = z
   })
   .strict();
 
+export const studyLogRetrySchema = z.object({ sourceText: z.string().trim().min(1).max(20_000) }).strict();
+
+export const studyLogReviewActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("complete") }).strict(),
+  z.object({ action: z.literal("skip") }).strict(),
+  z.object({ action: z.literal("cancel") }).strict(),
+  z.object({ action: z.literal("snooze"), dueOn: isoGameDaySchema }).strict(),
+]);
+
 const reasonSchema = z.string().trim().min(4).max(240);
 const promptSchema = z
   .object({

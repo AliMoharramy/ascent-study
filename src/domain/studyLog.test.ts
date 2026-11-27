@@ -45,4 +45,12 @@ describe("study-log domain", () => {
     const source = "BFS uses a queue to explore vertices by distance.";
     expect(() => studyLog.validateStudyLogDecision(source, schedule("Depth-first search uses a stack."))).toThrow();
   });
+
+  it("validates retry material and action-specific snooze dates", () => {
+    expect(studyLog.studyLogRetrySchema.safeParse({ sourceText: " " })).toMatchObject({ success: false });
+    expect(studyLog.studyLogRetrySchema.safeParse({ sourceText: "Updated BFS notes." })).toMatchObject({ success: true });
+    expect(studyLog.studyLogReviewActionSchema.safeParse({ action: "snooze", dueOn: "2026-02-30" })).toMatchObject({ success: false });
+    expect(studyLog.studyLogReviewActionSchema.safeParse({ action: "snooze", dueOn: "2026-03-01" })).toMatchObject({ success: true });
+    expect(studyLog.studyLogReviewActionSchema.safeParse({ action: "complete", dueOn: "2026-03-01" })).toMatchObject({ success: false });
+  });
 });
