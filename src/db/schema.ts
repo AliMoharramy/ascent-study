@@ -447,6 +447,7 @@ export const studyLogs = pgTable("study_logs", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
   clientRequestId: text("client_request_id").notNull(),
+  requestFingerprint: text("request_fingerprint"),
   topic: text("topic").notNull(),
   courseId: text("course_id"),
   lessonId: text("lesson_id"),
@@ -903,7 +904,27 @@ export const aiCalls = pgTable("ai_calls", {
   costEst: num("cost_est").notNull().default(0),
   requestSummary: text("request_summary").notNull().default(""),
   responseJson: text("response_json").notNull().default("{}"),
+  gameDay: day("game_day"),
+  budgetMonth: text("budget_month"),
+  reservationId: text("reservation_id"),
   createdAt: ts("created_at").notNull(),
+});
+
+export type AiBudgetReservationStatus = "reserved" | "settled" | "uncertain";
+
+export const aiBudgetReservations = pgTable("ai_budget_reservations", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  requestId: text("request_id").notNull(),
+  purpose: text("purpose").notNull(),
+  gameDay: day("game_day").notNull(),
+  budgetMonth: text("budget_month").notNull(),
+  reservedCost: num("reserved_cost").notNull(),
+  settledCost: num("settled_cost").notNull().default(0),
+  status: text("status").$type<AiBudgetReservationStatus>().notNull(),
+  expiresAt: ts("expires_at").notNull(),
+  createdAt: ts("created_at").notNull(),
+  updatedAt: ts("updated_at").notNull(),
 });
 
 export const reminders = pgTable("reminders", {
@@ -1044,6 +1065,7 @@ export const pgTables = {
   wellness_logs: wellnessLogs,
   pretests,
   ai_calls: aiCalls,
+  ai_budget_reservations: aiBudgetReservations,
   reminders,
   challenge_cards: challengeCards,
   season_claims: seasonClaims,

@@ -14,6 +14,12 @@ export class ClientApiError extends Error {
   }
 }
 
+/** An absent response or server error can follow a committed write; replay the same logical mutation safely. */
+export function isAmbiguousMutationOutcome(error: unknown): boolean {
+  if (error instanceof ClientApiError) return error.status === 0 || error.status >= 500;
+  return true;
+}
+
 function csrf(): string {
   const m = document.cookie.match(/(?:^|;\s*)ascent_csrf=([^;]+)/);
   return m ? decodeURIComponent(m[1]!) : "";

@@ -6,7 +6,7 @@ import { reminders } from "@/db/schema";
 import { currentStudyGameDay } from "@/domain/studyLog";
 import { createUser } from "./auth";
 import { ensureDefaultConfig, updateConfig } from "./config";
-import { dueStudyLogReviews, submitStudyLog } from "./studyLogs";
+import { actOnStudyLogReview, dueStudyLogReviews, submitStudyLog } from "./studyLogs";
 import { ensureTodayReminders } from "./reminders";
 
 let fixture: TestDb;
@@ -130,6 +130,32 @@ describe("PostgreSQL reminders with fixed study reviews", () => {
     expect(created).toHaveLength(2);
     expect(created.every((reminder) => reminder.anchorKey.startsWith("study-review:"))).toBe(true);
     expect(await dueStudyLogReviews(fixture.db, userId, today)).toHaveLength(6);
+  });
+
+  it.each([
+    ["complete", "done"],
+    ["snooze", "pending"],
+    ["skip", "skipped"],
+    ["cancel", "canceled"],
+  ] as const)("removes the old actionable reminder when a review is %s", async (action, expectedStatus) => {
+    const log = await addLog(3, `reminder-action-${action}`);
+    const review = log.reviews.find((candidate) => candidate.offsetDays === 3)!;
+    await ensureTodayReminders(fixture.db, userId, today);
+    expect(await fixture.db.select().from(reminders).where(eq(reminders.anchorKey, `study-review:${review.id}`))).toHaveLength(1);
+
+    const request = action === "snooze"
+      ? { action, dueOn: "2026-11-16", clientRequestId: `reminder-act-${action}-001` }
+      : { action, clientRequestId: `reminder-act-${action}-001` };
+    const updated = await actOnStudyLogReview(fixture.db, userId, review.id, request, today);
+
+    expect(updated.status).toBe(expectedStatus);
+    expect(await fixture.db.select().from(reminders).where(eq(reminders.anchorKey, `study-review:${review.id}`))).toEqual([]);
+    expect(await dueStudyLogReviews(fixture.db, userId, today)).toEqual([]);
+    if (action === "snooze") {
+      await ensureTodayReminders(fixture.db, userId, "2026-11-16");
+      expect(await fixture.db.select().from(reminders).where(eq(reminders.anchorKey, `study-review:${review.id}`))).toHaveLength(1);
+      expect(await dueStudyLogReviews(fixture.db, userId, "2026-11-16")).toHaveLength(1);
+    }
   });
 
   it("surfaces a review on the correct local game day after the DST clock change", async () => {

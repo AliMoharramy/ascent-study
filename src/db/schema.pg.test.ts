@@ -41,10 +41,11 @@ describe("postgres baseline (Database V2, S1)", () => {
     expect(names).toContain("_migrations");
     expect(names).toContain("study_logs");
     expect(names).toContain("study_log_reviews");
+    expect(names).toContain("ai_budget_reservations");
     for (const table of Object.keys(pgTables)) expect(names, table).toContain(table);
-    // 72 application tables + the migration journal
+    // 73 application tables + the migration journal
     expect(names.length).toBe(Object.keys(pgTables).length + 1);
-    expect(Object.keys(pgTables)).toHaveLength(72);
+    expect(Object.keys(pgTables)).toHaveLength(73);
   });
 
   it("records the applied version with its checksum", async () => {

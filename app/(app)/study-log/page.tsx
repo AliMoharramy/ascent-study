@@ -30,8 +30,10 @@ export default async function StudyLogPage() {
     ? await db.select({ id: chapters.id, no: chapters.no, title: chapters.title, subjectId: chapters.subjectId })
       .from(chapters).where(inArray(chapters.subjectId, subjectIds)).orderBy(asc(chapters.subjectId), asc(chapters.no))
     : [];
-  const recent = (await listStudyLogs(db, userId)).map(({ log, reviews }) => ({
+  const history = await listStudyLogs(db, userId);
+  const recent = history.items.map(({ log, reviews }) => ({
     id: log.id,
+    clientRequestId: log.clientRequestId,
     topic: log.topic,
     courseId: log.courseId,
     lessonId: log.lessonId,
@@ -54,6 +56,7 @@ export default async function StudyLogPage() {
         lessons={lessonRows.map((lesson) => ({ ...lesson, chapterIds: chaptersByLesson.get(lesson.id) ?? [] }))}
         chapters={chapterOptions}
         recent={recent}
+        nextCursor={history.nextCursor}
       />
     </div>
   );

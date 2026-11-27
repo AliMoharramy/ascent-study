@@ -62,6 +62,7 @@ describe("PostgreSQL study-log lifecycle", () => {
       [30, "2026-12-14", "2026-12-14"],
     ]);
     expect(result.reviews.every((review) => review.front && review.back)).toBe(true);
+    expect(result.log).not.toHaveProperty("requestFingerprint");
   });
 
   it("persists no-sequence and needs-material decisions without reviews", async () => {
@@ -126,6 +127,108 @@ describe("PostgreSQL study-log lifecycle", () => {
     const fresh = await studyLogService.submitStudyLog(fixture.db, userId, input("study-idempotent-002"), today, runEvaluator);
     expect(fresh.log.id).not.toBe(first.log.id);
     expect(calls).toBe(2);
+  });
+
+  it("replays a committed submission when its HTTP response is lost, even after analysis edits", async () => {
+    const request = input("study-lost-response-001");
+    let calls = 0;
+    const committed = await studyLogService.submitStudyLog(fixture.db, userId, request, today, async () => {
+      calls += 1;
+      return null;
+    });
+    // Simulate the server commit succeeding while the browser never receives that response.
+    await studyLogService.retryStudyLog(fixture.db, userId, committed.log.id, retryInput("study-lost-response-retry-001", "Edited source after the first analysis."), today, evaluator(null));
+
+    const replay = await studyLogService.submitStudyLog(fixture.db, userId, request, today, async () => {
+      calls += 1;
+      return schedule();
+    });
+
+    expect(replay.log.id).toBe(committed.log.id);
+    expect(replay.log.sourceText).toBe("Edited source after the first analysis.");
+    expect(calls).toBe(1);
+  });
+
+  it("replays omitted study-day submissions after game-day rollover", async () => {
+    const request = input("study-rollover-replay-001", { studiedOn: undefined });
+    const first = await studyLogService.submitStudyLog(fixture.db, userId, request, today, evaluator(null));
+    const replay = await studyLogService.submitStudyLog(fixture.db, userId, request, "2026-11-15", evaluator(schedule()));
+
+    expect(replay.log.id).toBe(first.log.id);
+    expect(replay.log.studiedOn).toBe(today);
+  });
+
+  it("replays review-action requests after game-day rollover", async () => {
+    const result = await studyLogService.submitStudyLog(fixture.db, userId, input("study-action-rollover-001"), today, evaluator(schedule()));
+    const request = reviewAction("complete", "review-rollover-action-001");
+    const first = await studyLogService.actOnStudyLogReview(fixture.db, userId, result.reviews[0]!.id, request, today);
+    const replay = await studyLogService.actOnStudyLogReview(fixture.db, userId, result.reviews[0]!.id, request, "2026-11-15");
+
+    expect(replay).toEqual(first);
+  });
+
+  it("returns bounded deterministic history pages without source text", async () => {
+    const createdAt = "2026-11-14T10:00:00.000Z";
+    await fixture.db.insert(studyLogs).values(Array.from({ length: 7 }, (_, index) => ({
+      id: `history-${index}`,
+      userId,
+      clientRequestId: `history-request-${index}`,
+      topic: `History ${index}`,
+      courseId: null,
+      lessonId: null,
+      chapterId: null,
+      studiedOn: today,
+      sourceText: `private source ${index}`,
+      status: "no_sequence" as const,
+      decision: "no_sequence" as const,
+      reason: "No sequence needed.",
+      analysisStartedAt: null,
+      aiConsentAt: createdAt,
+      createdAt,
+      updatedAt: createdAt,
+    })));
+
+    const first = await studyLogService.listStudyLogs(fixture.db, userId, { limit: 3 });
+    const second = await studyLogService.listStudyLogs(fixture.db, userId, { limit: 3, cursor: first.nextCursor! });
+    const third = await studyLogService.listStudyLogs(fixture.db, userId, { limit: 3, cursor: second.nextCursor! });
+
+    expect(first.items).toHaveLength(3);
+    expect(second.items).toHaveLength(3);
+    expect(third.items).toHaveLength(1);
+    expect([...first.items, ...second.items, ...third.items].map(({ log }) => log.id)).toEqual([
+      "history-6", "history-5", "history-4", "history-3", "history-2", "history-1", "history-0",
+    ]);
+    expect(first.items[0]!.log).not.toHaveProperty("sourceText");
+    expect(first.nextCursor).toBeTruthy();
+    expect(third.nextCursor).toBeNull();
+  });
+
+  it("caps an oversized history page at fifty rows", async () => {
+    const createdAt = "2026-11-14T10:00:00.000Z";
+    await fixture.db.insert(studyLogs).values(Array.from({ length: 55 }, (_, index) => ({
+      id: `bounded-history-${index}`,
+      userId,
+      clientRequestId: `bounded-history-request-${index}`,
+      topic: `Bounded history ${index}`,
+      courseId: null,
+      lessonId: null,
+      chapterId: null,
+      studiedOn: today,
+      sourceText: `private source ${index}`,
+      status: "no_sequence" as const,
+      decision: "no_sequence" as const,
+      reason: "No sequence needed.",
+      analysisStartedAt: null,
+      aiConsentAt: createdAt,
+      createdAt,
+      updatedAt: createdAt,
+    })));
+
+    const page = await studyLogService.listStudyLogs(fixture.db, userId, { limit: 500 });
+
+    expect(page.items).toHaveLength(50);
+    expect(page.nextCursor).toBeTruthy();
+    expect(page.items.every(({ log }) => !("sourceText" in log))).toBe(true);
   });
 
   it("claims a concurrent request only once", async () => {

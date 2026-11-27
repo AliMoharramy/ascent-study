@@ -6,6 +6,7 @@ describe("Drizzle study-log schema", () => {
     const names = Object.keys(pgTables);
     expect(names).toContain("study_logs");
     expect(names).toContain("study_log_reviews");
-    expect(names).toHaveLength(72);
+    expect(names).toContain("ai_budget_reservations");
+    expect(names).toHaveLength(73);
   });
 });

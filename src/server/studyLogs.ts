@@ -1,7 +1,7 @@
-import { and, asc, desc, eq, getTableColumns, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray, lt, lte, or } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { withUserTransaction, type Db } from "@/db/client";
-import { chapters, courses, lessonChapters, lessons, studyLogReviews, studyLogs } from "@/db/schema";
+import { chapters, courses, lessonChapters, lessons, reminders, studyLogReviews, studyLogs } from "@/db/schema";
 import { studyLogDecisionSchema, studyLogSubmissionSchema, studyLogRetrySchema, validateStudyLogDecision, reviewDatesForStudyDay, isoGameDaySchema, STUDY_LOG_ANALYSIS_LEASE_MS } from "@/domain/studyLog";
 import { appendEvent, EventRequestConflict, replayOf } from "@/events/store";
 import { newId, nowIso } from "@/lib/ids";
@@ -21,38 +21,52 @@ type Submission = {
   sourceText: string;
   clientRequestId: string;
   studiedOn: string;
+  studiedOnExplicit: boolean;
   courseId: string | null;
   lessonId: string | null;
   chapterId: string | null;
   consentToRemoteAi: true;
+  requestFingerprint: string;
 };
 
-export type StudyLogEvaluationInput = Pick<Submission, "topic" | "sourceText" | "courseId" | "lessonId" | "chapterId" | "studiedOn">;
+export type StudyLogEvaluationInput = Pick<Submission, "topic" | "sourceText" | "courseId" | "lessonId" | "chapterId" | "studiedOn"> & { budgetRequestId: string };
 export type StudyLogEvaluator = (input: StudyLogEvaluationInput) => Promise<unknown | null>;
 export type StudyReviewAction = "complete" | "snooze" | "skip" | "cancel";
 export type StudyReviewActionInput = { action: StudyReviewAction; dueOn?: string; clientRequestId: string };
 
 type LogRow = typeof studyLogs.$inferSelect;
 type ReviewRow = typeof studyLogReviews.$inferSelect;
-export type StudyLogBundle = { log: LogRow; reviews: ReviewRow[] };
+export type StudyLogBundle = { log: Omit<LogRow, "requestFingerprint">; reviews: ReviewRow[] };
 export type DueStudyLogReview = ReviewRow & { topic: string };
 
 function normalizeSubmission(input: unknown, today: string): Submission {
   const parsed = studyLogSubmissionSchema.parse(input);
-  return {
+  const fingerprintInput = {
     topic: parsed.topic,
     sourceText: parsed.sourceText,
-    clientRequestId: parsed.clientRequestId,
-    studiedOn: isoGameDaySchema.parse(parsed.studiedOn ?? today),
+    studiedOn: parsed.studiedOn ?? null,
     courseId: parsed.courseId ?? null,
     lessonId: parsed.lessonId ?? null,
     chapterId: parsed.chapterId ?? null,
     consentToRemoteAi: true,
   };
+  return {
+    topic: parsed.topic,
+    sourceText: parsed.sourceText,
+    clientRequestId: parsed.clientRequestId,
+    studiedOn: isoGameDaySchema.parse(parsed.studiedOn ?? today),
+    studiedOnExplicit: parsed.studiedOn !== undefined,
+    courseId: parsed.courseId ?? null,
+    lessonId: parsed.lessonId ?? null,
+    chapterId: parsed.chapterId ?? null,
+    consentToRemoteAi: true,
+    requestFingerprint: createHash("sha256").update(JSON.stringify(fingerprintInput)).digest("hex"),
+  };
 }
 
 function sameSubmission(row: LogRow, request: Submission): boolean {
-  return row.topic === request.topic && row.sourceText === request.sourceText && row.studiedOn === request.studiedOn &&
+  if (row.requestFingerprint !== null) return row.requestFingerprint === request.requestFingerprint;
+  return row.topic === request.topic && row.sourceText === request.sourceText && (!request.studiedOnExplicit || row.studiedOn === request.studiedOn) &&
     row.courseId === request.courseId && row.lessonId === request.lessonId && row.chapterId === request.chapterId;
 }
 
@@ -89,8 +103,10 @@ async function assertReferences(db: Db, userId: string, refs: Pick<Submission, "
 }
 
 async function readBundle(db: Db, userId: string, logId: string): Promise<StudyLogBundle> {
-  const log = (await db.select().from(studyLogs).where(and(eq(studyLogs.id, logId), eq(studyLogs.userId, userId))).limit(1))[0];
-  if (!log) throw new StudyLogNotFound();
+  const storedLog = (await db.select().from(studyLogs).where(and(eq(studyLogs.id, logId), eq(studyLogs.userId, userId))).limit(1))[0];
+  if (!storedLog) throw new StudyLogNotFound();
+  const { requestFingerprint, ...log } = storedLog;
+  void requestFingerprint;
   const reviews = await db.select().from(studyLogReviews)
     .where(and(eq(studyLogReviews.studyLogId, logId), eq(studyLogReviews.userId, userId)))
     .orderBy(asc(studyLogReviews.checkpoint));
@@ -107,7 +123,7 @@ async function defaultEvaluator(db: Db, userId: string, input: StudyLogEvaluatio
     "Choose needs_material when the source is too thin or unclear to support useful questions. Choose no_sequence when the material is not meaningfully improved by spaced recall. For each scheduled review, make front a cloze sentence with exactly one {{blank}} marker; back must be the exact omitted words, and inserting back into front must reproduce evidence exactly. Keep evidence a short exact excerpt from the source. Do not add markdown.",
   ].join(" ");
   const user = JSON.stringify({ topic: input.topic, sourceText: input.sourceText });
-  const result = await remoteCall(db, userId, "study_log_review_planning", system, user, studyLogDecisionSchema, today, "study_log_review_planning: user-submitted study material");
+  const result = await remoteCall(db, userId, "study_log_review_planning", system, user, studyLogDecisionSchema, today, "study_log_review_planning: redacted", { requestId: input.budgetRequestId });
   return result?.value ?? null;
 }
 
@@ -138,6 +154,7 @@ async function evaluateClaim(db: Db, userId: string, logId: string, claim: { row
       lessonId: claim.row.lessonId,
       chapterId: claim.row.chapterId,
       studiedOn: claim.row.studiedOn,
+      budgetRequestId: `study-log-analysis:${logId}:${claim.startedAt}`,
     });
   } catch {
     candidate = null;
@@ -203,7 +220,7 @@ async function claimNewOrStale(db: Db, userId: string, request: Submission): Pro
     await assertReferences(tx, userId, request);
     const startedAt = nowIso();
     const row: typeof studyLogs.$inferInsert = {
-      id: newId(), userId, clientRequestId: request.clientRequestId, topic: request.topic,
+      id: newId(), userId, clientRequestId: request.clientRequestId, requestFingerprint: request.requestFingerprint, topic: request.topic,
       courseId: request.courseId, lessonId: request.lessonId, chapterId: request.chapterId,
       studiedOn: request.studiedOn, sourceText: request.sourceText, status: "processing", decision: null,
       reason: "", analysisStartedAt: startedAt, aiConsentAt: startedAt, createdAt: startedAt, updatedAt: startedAt,
@@ -266,15 +283,74 @@ export async function getStudyLog(db: Db, userId: string, logId: string): Promis
   return await readBundle(db, userId, logId);
 }
 
-export async function listStudyLogs(db: Db, userId: string): Promise<StudyLogBundle[]> {
-  const logs = await db.select().from(studyLogs).where(eq(studyLogs.userId, userId)).orderBy(desc(studyLogs.createdAt)).limit(50);
-  if (logs.length === 0) return [];
-  const reviews = await db.select().from(studyLogReviews)
+export const STUDY_LOG_HISTORY_DEFAULT_LIMIT = 20;
+export const STUDY_LOG_HISTORY_MAX_LIMIT = 50;
+
+type StudyLogSummaryRow = Omit<LogRow, "sourceText" | "requestFingerprint">;
+type StudyReviewSummaryRow = Pick<ReviewRow, "id" | "studyLogId" | "checkpoint" | "offsetDays" | "scheduledOn" | "dueOn" | "status">;
+export type StudyLogSummaryBundle = { log: StudyLogSummaryRow; reviews: StudyReviewSummaryRow[] };
+export type StudyLogHistoryPage = { items: StudyLogSummaryBundle[]; nextCursor: string | null };
+
+type HistoryCursor = { createdAt: string; id: string };
+
+function encodeHistoryCursor(row: HistoryCursor): string {
+  return Buffer.from(JSON.stringify(row)).toString("base64url");
+}
+
+function decodeHistoryCursor(cursor: string): HistoryCursor {
+  try {
+    const value = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Partial<HistoryCursor>;
+    if (typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt)) || typeof value.id !== "string" || !value.id) throw new Error();
+    return { createdAt: value.createdAt, id: value.id };
+  } catch {
+    throw new StudyLogConflict("Invalid study-log history cursor");
+  }
+}
+
+export async function listStudyLogs(db: Db, userId: string, options: { limit?: number; cursor?: string | null } = {}): Promise<StudyLogHistoryPage> {
+  const requestedLimit = Number.isFinite(options.limit) ? Math.floor(options.limit!) : STUDY_LOG_HISTORY_DEFAULT_LIMIT;
+  const limit = Math.max(1, Math.min(STUDY_LOG_HISTORY_MAX_LIMIT, requestedLimit || STUDY_LOG_HISTORY_DEFAULT_LIMIT));
+  const cursor = options.cursor ? decodeHistoryCursor(options.cursor) : null;
+  const cursorCondition = cursor
+    ? or(lt(studyLogs.createdAt, cursor.createdAt), and(eq(studyLogs.createdAt, cursor.createdAt), lt(studyLogs.id, cursor.id)))
+    : undefined;
+  const condition = cursorCondition ? and(eq(studyLogs.userId, userId), cursorCondition) : eq(studyLogs.userId, userId);
+  const rows = await db.select({
+    id: studyLogs.id,
+    userId: studyLogs.userId,
+    clientRequestId: studyLogs.clientRequestId,
+    topic: studyLogs.topic,
+    courseId: studyLogs.courseId,
+    lessonId: studyLogs.lessonId,
+    chapterId: studyLogs.chapterId,
+    studiedOn: studyLogs.studiedOn,
+    status: studyLogs.status,
+    decision: studyLogs.decision,
+    reason: studyLogs.reason,
+    analysisStartedAt: studyLogs.analysisStartedAt,
+    aiConsentAt: studyLogs.aiConsentAt,
+    createdAt: studyLogs.createdAt,
+    updatedAt: studyLogs.updatedAt,
+  }).from(studyLogs).where(condition).orderBy(desc(studyLogs.createdAt), desc(studyLogs.id)).limit(limit + 1);
+  const hasMore = rows.length > limit;
+  const logs = rows.slice(0, limit);
+  if (logs.length === 0) return { items: [], nextCursor: null };
+  const reviews = await db.select({
+    id: studyLogReviews.id,
+    studyLogId: studyLogReviews.studyLogId,
+    checkpoint: studyLogReviews.checkpoint,
+    offsetDays: studyLogReviews.offsetDays,
+    scheduledOn: studyLogReviews.scheduledOn,
+    dueOn: studyLogReviews.dueOn,
+    status: studyLogReviews.status,
+  }).from(studyLogReviews)
     .where(and(eq(studyLogReviews.userId, userId), inArray(studyLogReviews.studyLogId, logs.map((row) => row.id))))
     .orderBy(asc(studyLogReviews.checkpoint));
-  const byLog = new Map<string, ReviewRow[]>();
+  const byLog = new Map<string, StudyReviewSummaryRow[]>();
   for (const review of reviews) byLog.set(review.studyLogId, [...(byLog.get(review.studyLogId) ?? []), review]);
-  return logs.map((log) => ({ log, reviews: byLog.get(log.id) ?? [] }));
+  const items = logs.map((log) => ({ log, reviews: byLog.get(log.id) ?? [] }));
+  const last = logs.at(-1)!;
+  return { items, nextCursor: hasMore ? encodeHistoryCursor({ createdAt: last.createdAt, id: last.id }) : null };
 }
 
 export async function dueStudyLogReviews(db: Db, userId: string, today: string): Promise<DueStudyLogReview[]> {
@@ -292,7 +368,6 @@ export async function actOnStudyLogReview(db: Db, userId: string, reviewId: stri
     reviewId,
     action: input.action,
     ...(input.action === "snooze" ? { dueOn: isoGameDaySchema.parse(input.dueOn) } : {}),
-    gameDay: day,
   };
   if (input.action === "snooze") {
     const newDue = isoGameDaySchema.parse(input.dueOn);
@@ -302,6 +377,7 @@ export async function actOnStudyLogReview(db: Db, userId: string, reviewId: stri
   return await withUserTransaction(db, userId, async (tx) => {
     const prior = await replayOf(tx, userId, "study_log.review_acted", input.clientRequestId, request);
     if (prior) {
+      await tx.delete(reminders).where(and(eq(reminders.userId, userId), eq(reminders.anchorKey, `study-review:${reviewId}`)));
       const previous = prior.payload.result;
       if (!previous || typeof previous !== "object") throw new EventRequestConflict();
       return previous as ReviewRow;
@@ -314,6 +390,7 @@ export async function actOnStudyLogReview(db: Db, userId: string, reviewId: stri
           : input.action === "cancel" ? review.status === "canceled"
             : false;
       if (repeatedAction) {
+        await tx.delete(reminders).where(and(eq(reminders.userId, userId), eq(reminders.anchorKey, `study-review:${reviewId}`)));
         await appendEvent(tx, {
           userId,
           type: "study_log.review_acted",
@@ -326,6 +403,7 @@ export async function actOnStudyLogReview(db: Db, userId: string, reviewId: stri
       throw new StudyLogConflict("This review has already been resolved");
     }
     if (input.action === "snooze" && review.dueOn === input.dueOn) {
+      await tx.delete(reminders).where(and(eq(reminders.userId, userId), eq(reminders.anchorKey, `study-review:${reviewId}`)));
       await appendEvent(tx, {
         userId,
         type: "study_log.review_acted",
@@ -344,6 +422,7 @@ export async function actOnStudyLogReview(db: Db, userId: string, reviewId: stri
       updatedAt: at,
     }).where(and(eq(studyLogReviews.id, reviewId), eq(studyLogReviews.userId, userId), eq(studyLogReviews.status, "pending"))).returning())[0];
     if (!updated) throw new StudyLogConflict("This review has already been resolved");
+    await tx.delete(reminders).where(and(eq(reminders.userId, userId), eq(reminders.anchorKey, `study-review:${reviewId}`)));
     await appendEvent(tx, {
       userId,
       type: "study_log.review_acted",

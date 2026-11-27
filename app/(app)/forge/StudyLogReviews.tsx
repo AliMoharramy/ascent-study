@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { addDaysIso } from "@/i18n/jalali";
-import { apiFetch, requestId } from "@/ui/client";
+import { apiFetch, isAmbiguousMutationOutcome, requestId } from "@/ui/client";
 import { EmptyState, Eyebrow, cx } from "@/ui/components";
 import { useFeedback } from "@/ui/feedback";
 import { Icon } from "@/ui/icons";
 import { useRouter } from "next/navigation";
+import { createStableMutationAttempt, mutationAttemptBody, type StableMutationAttempt } from "@/ui/studyLogMutation";
 
 type DueReview = {
   id: string;
@@ -27,25 +28,39 @@ export function StudyLogReviews({ due, today }: { due: DueReview[]; today: strin
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [newDueOn, setNewDueOn] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [pendingActions, setPendingActions] = useState<Record<string, StableMutationAttempt<Record<string, unknown>>>>({});
   const [error, setError] = useState("");
   const nextGameDay = addDaysIso(today, 1);
 
-  async function act(review: DueReview, action: "complete" | "skip" | "cancel" | "snooze") {
+  async function sendAttempt(review: DueReview, attempt: StableMutationAttempt<Record<string, unknown>>) {
     setBusyId(review.id);
     setError("");
     try {
-      await apiFetch(`/api/study-log-reviews/${encodeURIComponent(review.id)}`, {
-        body: action === "snooze"
-          ? { action, dueOn: newDueOn[review.id] ?? nextGameDay, clientRequestId: requestId() }
-          : { action, clientRequestId: requestId() },
-      });
+      await apiFetch(`/api/study-log-reviews/${encodeURIComponent(review.id)}`, { body: mutationAttemptBody(attempt) });
+      setPendingActions((current) => { const next = { ...current }; delete next[review.id]; return next; });
+      const action = attempt.body.action as "complete" | "skip" | "cancel" | "snooze";
       toast(action === "complete" ? "Study review completed" : action === "snooze" ? "Study review rescheduled" : action === "skip" ? "Study review skipped" : "Study review canceled");
       router.refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "This review could not be updated.");
+      const ambiguous = isAmbiguousMutationOutcome(cause);
+      if (!ambiguous) setPendingActions((current) => { const next = { ...current }; delete next[review.id]; return next; });
+      setError(ambiguous
+        ? "The server may have applied this review action, but the response was not confirmed. Retry delivery to safely replay the same action."
+        : cause instanceof Error ? cause.message : "This review could not be updated.");
+      router.refresh();
     } finally {
       setBusyId(null);
     }
+  }
+
+  function act(review: DueReview, action: "complete" | "skip" | "cancel" | "snooze") {
+    if (pendingActions[review.id]) return;
+    const payload = action === "snooze"
+      ? { action, dueOn: newDueOn[review.id] ?? nextGameDay }
+      : { action };
+    const attempt = createStableMutationAttempt(null, payload, requestId);
+    setPendingActions((current) => ({ ...current, [review.id]: attempt }));
+    void sendAttempt(review, attempt);
   }
 
   return (
@@ -66,6 +81,7 @@ export function StudyLogReviews({ due, today }: { due: DueReview[]; today: strin
           {due.map((review) => {
             const overdue = review.dueOn < today;
             const busy = busyId === review.id;
+            const pending = pendingActions[review.id];
             return (
               <li key={review.id} className="flex flex-col gap-3 rounded-3xl bg-surface-2 p-4">
                 <div className="flex flex-wrap items-center gap-2">
@@ -97,19 +113,26 @@ export function StudyLogReviews({ due, today }: { due: DueReview[]; today: strin
                   <p>Status <span className="font-bold text-ink">Pending</span></p>
                 </div>
 
+                {pending && (
+                  <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-yellow/40 bg-yellow/10 p-3 text-caption text-muted">
+                    <span>Action outcome is unconfirmed. The retry keeps the original action and request key.</span>
+                    <button type="button" className="btn-ghost" disabled={busy} onClick={() => void sendAttempt(review, pending)}>Retry delivery</button>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
-                  <button type="button" className="btn-accent" disabled={busy} onClick={() => void act(review, "complete")}>
+                  <button type="button" className="btn-accent" disabled={busy || !!pending} onClick={() => act(review, "complete")}>
                     <Icon name="check" size={15} /> {busy ? "Saving…" : "Complete"}
                   </button>
                   <label className="ms-auto flex min-w-44 flex-1 items-center gap-2 text-caption text-muted">
                     <span className="sr-only">Reschedule review date</span>
-                    <input type="date" min={nextGameDay} value={newDueOn[review.id] ?? nextGameDay} onChange={(event) => setNewDueOn((current) => ({ ...current, [review.id]: event.target.value }))} className="field min-w-0 flex-1 py-1.5 font-mono text-caption" />
-                    <button type="button" className="btn-ghost px-2 py-1.5" disabled={busy} onClick={() => void act(review, "snooze")}>
+                    <input type="date" min={nextGameDay} value={newDueOn[review.id] ?? nextGameDay} onChange={(event) => setNewDueOn((current) => ({ ...current, [review.id]: event.target.value }))} className="field min-w-0 flex-1 py-1.5 font-mono text-caption" disabled={busy || !!pending} />
+                    <button type="button" className="btn-ghost px-2 py-1.5" disabled={busy || !!pending} onClick={() => act(review, "snooze")}>
                       Move
                     </button>
                   </label>
-                  <button type="button" className="btn-ghost px-2 py-1.5" title="Skip this checkpoint" disabled={busy} onClick={() => void act(review, "skip")}>Skip</button>
-                  <button type="button" className="btn-ghost px-2 py-1.5 text-muted" title="Cancel this checkpoint" disabled={busy} onClick={() => void act(review, "cancel")}>Cancel</button>
+                  <button type="button" className="btn-ghost px-2 py-1.5" title="Skip this checkpoint" disabled={busy || !!pending} onClick={() => act(review, "skip")}>Skip</button>
+                  <button type="button" className="btn-ghost px-2 py-1.5 text-muted" title="Cancel this checkpoint" disabled={busy || !!pending} onClick={() => act(review, "cancel")}>Cancel</button>
                 </div>
               </li>
             );

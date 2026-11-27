@@ -2,13 +2,21 @@ import { currentStudyGameDay, studyLogSubmissionSchema } from "@/domain/studyLog
 import { api, body } from "@/server/http";
 import { listStudyLogs, submitStudyLog } from "@/server/studyLogs";
 
-export const GET = api(async ({ db, userId, session }) => {
+export const GET = api(async ({ db, userId, session, req }) => {
   const today = currentStudyGameDay(new Date(), session.user.timezone, session.user.rolloverHour);
-  const logs = await listStudyLogs(db, userId);
+  const url = new URL(req.url);
+  const rawLimit = url.searchParams.get("limit");
+  const parsedLimit = rawLimit === null ? undefined : Number(rawLimit);
+  const page = await listStudyLogs(db, userId, {
+    limit: parsedLimit !== undefined && Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+    cursor: url.searchParams.get("cursor"),
+  });
   return {
     today,
-    studyLogs: logs.map(({ log, reviews }) => ({
+    nextCursor: page.nextCursor,
+    studyLogs: page.items.map(({ log, reviews }) => ({
       id: log.id,
+      clientRequestId: log.clientRequestId,
       topic: log.topic,
       courseId: log.courseId,
       lessonId: log.lessonId,
