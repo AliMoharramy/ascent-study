@@ -159,6 +159,9 @@ export default async function TodayPage() {
           <Link href="/run" className="btn-ghost-on-color mt-2 w-fit px-3 py-1.5 text-caption">
             Mini-run · 12 min <Icon name="arrow" size={13} />
           </Link>
+          <Link href="/study-log" className="btn-ghost-on-color mt-1 w-fit px-3 py-1.5 text-caption">
+            Log study notes <Icon name="arrow" size={13} />
+          </Link>
         </div>
       </Card>
 

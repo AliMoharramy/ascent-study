@@ -27,6 +27,7 @@ const SECONDARY: Item[] = [
   { href: "/ideas", label: "Ideas", icon: "bulb" },
   { href: "/character", label: "Me", icon: "user" },
   { href: "/courses", label: "Courses", icon: "book" },
+  { href: "/study-log", label: "Study log", icon: "book" },
   { href: "/codex", label: "Codex", icon: "layers" },
   { href: "/settings", label: "Settings", icon: "gear" },
 ];

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, getTableColumns, lte } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray, lte } from "drizzle-orm";
 import { withUserTransaction, type Db } from "@/db/client";
 import { chapters, courses, lessonChapters, lessons, studyLogReviews, studyLogs } from "@/db/schema";
 import { studyLogDecisionSchema, studyLogSubmissionSchema, validateStudyLogDecision, reviewDatesForStudyDay, isoGameDaySchema } from "@/domain/studyLog";
@@ -240,7 +240,13 @@ export async function getStudyLog(db: Db, userId: string, logId: string): Promis
 
 export async function listStudyLogs(db: Db, userId: string): Promise<StudyLogBundle[]> {
   const logs = await db.select().from(studyLogs).where(eq(studyLogs.userId, userId)).orderBy(desc(studyLogs.createdAt)).limit(50);
-  return await Promise.all(logs.map((row) => readBundle(db, userId, row.id)));
+  if (logs.length === 0) return [];
+  const reviews = await db.select().from(studyLogReviews)
+    .where(and(eq(studyLogReviews.userId, userId), inArray(studyLogReviews.studyLogId, logs.map((row) => row.id))))
+    .orderBy(asc(studyLogReviews.checkpoint));
+  const byLog = new Map<string, ReviewRow[]>();
+  for (const review of reviews) byLog.set(review.studyLogId, [...(byLog.get(review.studyLogId) ?? []), review]);
+  return logs.map((log) => ({ log, reviews: byLog.get(log.id) ?? [] }));
 }
 
 export async function dueStudyLogReviews(db: Db, userId: string, today: string): Promise<DueStudyLogReview[]> {
