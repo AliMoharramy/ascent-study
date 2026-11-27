@@ -34,6 +34,11 @@ describe("time / game day", () => {
     expect(localToUtc("2026-03-29", "02:00", "Europe/Paris").toISOString()).toBe("2026-03-29T01:00:00.000Z");
   });
 
+  it("uses the first occurrence when a rollover falls inside a repeated hour", () => {
+    expect(localToUtc("2026-10-25", "02:00", "Europe/Paris").toISOString()).toBe("2026-10-25T00:00:00.000Z");
+    expect(gameDayBounds("2026-10-24", "Europe/Paris", 2).end.toISOString()).toBe("2026-10-25T00:00:00.000Z");
+  });
+
   it("localToUtc and bounds", () => {
     expect(localToUtc("2026-11-14", "04:00").toISOString()).toBe("2026-11-14T00:30:00.000Z");
     const b = gameDayBounds("2026-11-14");

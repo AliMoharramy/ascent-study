@@ -172,5 +172,5 @@
 - [x] Give retry and Forge review actions request IDs, event-backed replay protection, same-state idempotency, and a hash-only retry event payload.
 - [x] Recover from decision/review persistence failures with a retryable state and expose a retry after a stalled five-minute processing lease.
 - [x] Compute game days from the local wall-clock rollover so daylight-saving transitions cannot shift study-log defaults or due reviews shown through Forge and reminders.
-- [x] Resolve local wall-clock boundaries for the next calendar day so DST-short and DST-long game days have accurate query bounds.
-- [x] Verify the final follow-up against the disposable local PostgreSQL database only: `npm test` (21 files, 216 tests), five relevant PostgreSQL suites (27 tests), typecheck, lint, format check, production build, and local smoke. The full PostgreSQL run remained idle in a chapter-weight update transaction and was stopped; focused affected suites passed.
+- [x] Resolve local wall-clock boundaries for the next calendar day so DST-short and DST-long game days have accurate query bounds; use the first instant when rollover falls in a repeated hour.
+- [x] Verify the final follow-up against the disposable local PostgreSQL database only: `npm test` (21 files, 217 tests), five relevant PostgreSQL suites (27 tests), typecheck, lint, format check, production build, and local smoke. The full PostgreSQL run remained idle in a chapter-weight update transaction and was stopped; focused affected suites passed.

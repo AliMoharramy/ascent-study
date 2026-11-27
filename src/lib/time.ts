@@ -51,30 +51,32 @@ export function tzOffsetMinutes(date: Date, timeZone = DEFAULT_TZ): number {
   return Math.round((asUtc - Math.floor(date.getTime() / 1000) * 1000) / 60_000);
 }
 
-/** Converts a local wall-clock (ISO date + "HH:MM") in a timezone into a UTC Date. */
+/** Converts local wall time into UTC, choosing the first repeated instant and shifting skipped times forward. */
 export function localToUtc(isoDate: string, hhmm: string, timeZone = DEFAULT_TZ): Date {
   const [h, m] = hhmm.split(":").map(Number);
   const guess = new Date(`${isoDate}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00Z`);
-  const fromOffset = (offset: number) => new Date(guess.getTime() - offset * 60_000);
-  const first = fromOffset(tzOffsetMinutes(guess, timeZone));
-  const firstParts = localParts(first, timeZone);
   const matches = (parts: ReturnType<typeof localParts>) =>
     parts.date === isoDate && parts.hour === h && parts.minute === m && parts.second === 0;
-  if (matches(firstParts)) return first;
-
-  const second = fromOffset(tzOffsetMinutes(first, timeZone));
-  const secondParts = localParts(second, timeZone);
-  if (matches(secondParts)) return second;
-
-  // For a skipped wall time, move forward through the gap to the nearest local time after it.
   const wallTime = (parts: ReturnType<typeof localParts>) => {
     const [year, month, day] = parts.date.split("-").map(Number);
     return Date.UTC(year!, month! - 1, day!, parts.hour, parts.minute, parts.second);
   };
-  const candidates = [
-    { date: first, wallTime: wallTime(firstParts) },
-    { date: second, wallTime: wallTime(secondParts) },
-  ];
+
+  // Sample both sides of the requested wall time to capture both offsets during a repeated hour.
+  const offsets = new Set(
+    [-36, 0, 36].map((hours) => tzOffsetMinutes(new Date(guess.getTime() + hours * 3_600_000), timeZone)),
+  );
+  const candidates = [...offsets].map((offset) => {
+    const date = new Date(guess.getTime() - offset * 60_000);
+    const parts = localParts(date, timeZone);
+    return { date, parts, wallTime: wallTime(parts) };
+  });
+  const exact = candidates
+    .filter((candidate) => matches(candidate.parts))
+    .sort((a, b) => a.date.getTime() - b.date.getTime())[0];
+  if (exact) return exact.date;
+
+  // For a skipped wall time, move forward through the gap to the nearest local time after it.
   const after = candidates
     .filter((candidate) => candidate.wallTime >= guess.getTime())
     .sort((a, b) => a.wallTime - b.wallTime)[0];
