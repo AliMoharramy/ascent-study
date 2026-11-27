@@ -19,6 +19,7 @@ import { LearningDenied } from "./learning";
 import { BuddyConsentRequired } from "./burnout";
 import { ProposalDenied } from "./coach";
 import { ExperimentDenied } from "./experiments";
+import { StudyLogConflict, StudyLogNotFound } from "./studyLogs";
 import { takeToken } from "./ratelimit";
 
 const RULE_ERRORS = [LifeEventDenied, QuestActionDenied, ShieldDenied, HabitLimit, ResetWeekDenied, UndoDenied, ClaimDenied, RestDayDenied, LifeDenied, ExtrasDenied, LearningDenied, BuddyConsentRequired, ProposalDenied, ExperimentDenied];
@@ -47,6 +48,8 @@ export function errorResponse(e: unknown) {
   if (e instanceof ZodError)
     return json({ error: { code: "validation", message: e.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`).join("; ") } }, 400);
   if (e instanceof FocusConflict || e instanceof TimerError) return json({ error: { code: "conflict", message: e.message } }, 409);
+  if (e instanceof StudyLogConflict) return json({ error: { code: "conflict", message: e.message } }, 409);
+  if (e instanceof StudyLogNotFound) return json({ error: { code: "not_found", message: e.message } }, 404);
   if (e instanceof CheckinLocked) return json({ error: { code: "locked", message: e.message } }, 409);
   if (e instanceof EventRequestConflict) return json({ error: { code: "conflict", message: e.message } }, 409);
   if (RULE_ERRORS.some((C) => e instanceof C)) return json({ error: { code: "rule", message: (e as Error).message } }, 409);

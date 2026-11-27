@@ -118,6 +118,9 @@ export const EVENT_TYPES = [
   "personal_task.updated",
   "personal_task.completed",
   "personal_task.reopened",
+  "study_log.created",
+  "study_log.decision_recorded",
+  "study_log.review_acted",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];
