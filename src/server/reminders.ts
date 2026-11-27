@@ -6,6 +6,7 @@ import { appendEvent } from "@/events/store";
 import { activeConfig } from "@/events/projections";
 import { newId, nowIso } from "@/lib/ids";
 import { localParts } from "@/lib/time";
+import { dueStudyLogReviews } from "./studyLogs";
 
 /**
  * Anchor reminders (#97, F-DUO-15): gentle nudges tied to real habit anchors plus three fixed anchors.
@@ -40,9 +41,20 @@ export async function ensureTodayReminders(db: Db, userId: string, today: string
   return await withUserTransaction(db, userId, async (tx) => {
   const cfg = (await activeConfig(tx, userId));
   if (!cfg.reminders.enabled || cfg.reminders.maxPerDay === 0) return 0;
-  const picked = (await anchorsFor(tx, userId, cfg)).slice(0, cfg.reminders.maxPerDay);
+  const studyReviews = await dueStudyLogReviews(tx, userId, today);
+  const studyAnchors: Anchor[] = studyReviews.map((review) => ({
+    key: `study-review:${review.id}`,
+    title: `Study review: ${review.topic} · checkpoint ${review.checkpoint}`,
+    time: "09:00",
+  }));
+  const picked = [...studyAnchors, ...(await anchorsFor(tx, userId, cfg))].slice(0, cfg.reminders.maxPerDay);
+  const existing = await tx.select({ anchorKey: reminders.anchorKey }).from(reminders)
+    .where(and(eq(reminders.userId, userId), eq(reminders.date, today)));
+  const existingKeys = new Set(existing.map((reminder) => reminder.anchorKey));
+  const remainingSlots = Math.max(0, cfg.reminders.maxPerDay - existing.length);
+  const toCreate = picked.filter((anchor) => !existingKeys.has(anchor.key)).slice(0, remainingSlots);
   let created = 0;
-  for (const a of picked) {
+  for (const a of toCreate) {
     const text = reminderText(a.title, cfg.reminders.tone);
     const r = (await tx
       .insert(reminders)
