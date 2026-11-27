@@ -64,6 +64,9 @@ for (const p of pages) {
   const redirected = res.status >= 300 && res.status < 400;
   check(`page ${p}`, res.status === 200 && !redirected, `HTTP ${res.status}${redirected ? ` → ${res.headers.get("location")}` : ""}`);
 }
+const forgeReview = await call("/forge?tab=review");
+const forgeReviewHtml = await forgeReview.text();
+check("Forge fixed study-review section", forgeReview.status === 200 && forgeReviewHtml.includes("Study-log reviews"), `HTTP ${forgeReview.status}`);
 
 // 3) main read APIs and one write
 for (const p of ["/api/tests", "/api/reviews", "/api/xp", "/api/plan", "/api/habits", "/api/quests", "/api/checkin", "/api/ideas", "/api/backups", "/api/study-logs"]) {
