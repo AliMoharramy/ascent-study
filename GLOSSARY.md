@@ -10,11 +10,11 @@ One proposed next action generated from the account's open Today, Courses, and M
 
 ## AI-assisted study log
 
-A user-submitted record of a study session with its topic and notes or transcript. The existing guarded AI adapter may plan reviews only from that submitted material; recording a focus session never creates or changes a study log.
+A user-submitted record of a study session with its topic and notes or transcript. Each submission or retry requires explicit consent before the topic and source text may be sent to the configured AI provider; course, lesson/video, and chapter references remain local. Recording a focus session never creates or changes a study log.
 
 ## Fixed study review
 
-One source-grounded prompt and answer scheduled by the server for +3, +7, +14, or +30 calendar days after a study log's date. Due reviews remain visible in Forge even when reminders are disabled or capped.
+One source-grounded cloze prompt and answer scheduled by the server for +3, +7, +14, or +30 calendar days after a study log's date. Filling the prompt's single blank with its answer must reproduce the cited source excerpt. Due reviews remain visible in Forge even when reminders are disabled or capped.
 
 ## Native focus session
 

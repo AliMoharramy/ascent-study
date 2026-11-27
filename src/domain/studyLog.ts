@@ -3,6 +3,7 @@ import { addDaysIso } from "@/i18n/jalali";
 import { gameDay } from "@/lib/time";
 
 export const STUDY_REVIEW_OFFSETS = [3, 7, 14, 30] as const;
+export const STUDY_LOG_ANALYSIS_LEASE_MS = 5 * 60_000;
 
 function isValidIsoDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value.startsWith("0000")) return false;
@@ -23,16 +24,21 @@ export const studyLogSubmissionSchema = z
     studiedOn: isoGameDaySchema.optional(),
     sourceText: z.string().trim().min(1).max(20_000),
     clientRequestId: z.string().trim().min(8).max(80),
+    consentToRemoteAi: z.literal(true),
   })
   .strict();
 
-export const studyLogRetrySchema = z.object({ sourceText: z.string().trim().min(1).max(20_000) }).strict();
+export const studyLogRetrySchema = z.object({
+  sourceText: z.string().trim().min(1).max(20_000),
+  clientRequestId: z.string().trim().min(8).max(80),
+  consentToRemoteAi: z.literal(true),
+}).strict();
 
 export const studyLogReviewActionSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("complete") }).strict(),
-  z.object({ action: z.literal("skip") }).strict(),
-  z.object({ action: z.literal("cancel") }).strict(),
-  z.object({ action: z.literal("snooze"), dueOn: isoGameDaySchema }).strict(),
+  z.object({ action: z.literal("complete"), clientRequestId: z.string().trim().min(8).max(80) }).strict(),
+  z.object({ action: z.literal("skip"), clientRequestId: z.string().trim().min(8).max(80) }).strict(),
+  z.object({ action: z.literal("cancel"), clientRequestId: z.string().trim().min(8).max(80) }).strict(),
+  z.object({ action: z.literal("snooze"), dueOn: isoGameDaySchema, clientRequestId: z.string().trim().min(8).max(80) }).strict(),
 ]);
 
 const reasonSchema = z.string().trim().min(4).max(240);
@@ -70,8 +76,14 @@ export function validateStudyLogDecision(sourceText: string, candidate: unknown)
   const decision = studyLogDecisionSchema.parse(candidate);
   if (decision.decision === "schedule") {
     const source = normalizeEvidence(sourceText);
-    if (decision.reviews.some((review) => !source.includes(normalizeEvidence(review.evidence)))) {
-      throw new Error("Review evidence must appear in the submitted source material");
+    if (decision.reviews.some((review) => {
+      const blanks = review.front.split("{{blank}}");
+      if (blanks.length !== 2) return true;
+      const reconstructed = normalizeEvidence(`${blanks[0]}${review.back}${blanks[1]}`);
+      const evidence = normalizeEvidence(review.evidence);
+      return !source.includes(evidence) || reconstructed !== evidence;
+    })) {
+      throw new Error("Each review must reconstruct its exact source evidence through one cloze blank");
     }
   }
   return decision;

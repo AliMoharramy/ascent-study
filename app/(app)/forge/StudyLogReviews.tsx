@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { addDaysIso } from "@/i18n/jalali";
-import { apiFetch } from "@/ui/client";
+import { apiFetch, requestId } from "@/ui/client";
 import { EmptyState, Eyebrow, cx } from "@/ui/components";
 import { useFeedback } from "@/ui/feedback";
 import { Icon } from "@/ui/icons";
@@ -35,7 +35,9 @@ export function StudyLogReviews({ due, today }: { due: DueReview[]; today: strin
     setError("");
     try {
       await apiFetch(`/api/study-log-reviews/${encodeURIComponent(review.id)}`, {
-        body: action === "snooze" ? { action, dueOn: newDueOn[review.id] ?? nextGameDay } : { action },
+        body: action === "snooze"
+          ? { action, dueOn: newDueOn[review.id] ?? nextGameDay, clientRequestId: requestId() }
+          : { action, clientRequestId: requestId() },
       });
       toast(action === "complete" ? "Study review completed" : action === "snooze" ? "Study review rescheduled" : action === "skip" ? "Study review skipped" : "Study review canceled");
       router.refresh();

@@ -64,6 +64,9 @@ for (const p of pages) {
   const redirected = res.status >= 300 && res.status < 400;
   check(`page ${p}`, res.status === 200 && !redirected, `HTTP ${res.status}${redirected ? ` → ${res.headers.get("location")}` : ""}`);
 }
+const studyLogPage = await call("/study-log");
+const studyLogHtml = await studyLogPage.text();
+check("study-log discloses remote AI consent and lesson/video link", studyLogPage.status === 200 && studyLogHtml.includes("configured AI provider") && studyLogHtml.includes("Lesson / video"), `HTTP ${studyLogPage.status}`);
 const forgeReview = await call("/forge?tab=review");
 const forgeReviewHtml = await forgeReview.text();
 check("Forge fixed study-review section", forgeReview.status === 200 && forgeReviewHtml.includes("Study-log reviews"), `HTTP ${forgeReview.status}`);
@@ -76,7 +79,9 @@ for (const p of ["/api/tests", "/api/reviews", "/api/xp", "/api/plan", "/api/hab
 const write = await json("/api/tests", { correct: 6, wrong: 1, blank: 0, clientRequestId: `smoke-${Date.now()}` });
 check("api POST /api/tests", write.status === 200, `HTTP ${write.status}`);
 const studySource = "Breadth-first search uses a queue to visit vertices by distance.";
-const studyWrite = await json("/api/study-logs", { topic: "Smoke study log", sourceText: studySource, clientRequestId: `smoke-study-${Date.now()}` });
+const noStudyConsent = await json("/api/study-logs", { topic: "Smoke study log", sourceText: studySource, clientRequestId: `smoke-study-no-consent-${Date.now()}` });
+check("study-log rejects missing AI consent", noStudyConsent.status === 400, `HTTP ${noStudyConsent.status}`);
+const studyWrite = await json("/api/study-logs", { topic: "Smoke study log", sourceText: studySource, clientRequestId: `smoke-study-${Date.now()}`, consentToRemoteAi: true });
 const studyResult = await studyWrite.json().catch(() => ({}));
 check("api POST /api/study-logs", studyWrite.status === 200 && !!studyResult.log?.id, `HTTP ${studyWrite.status}`);
 if (studyResult.log?.id) {

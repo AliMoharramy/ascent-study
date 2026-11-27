@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { createTestDb, type TestDb } from "@/db/testing";
-import { chapters, courses, lessons, studyLogReviews, studyLogs, subjects } from "@/db/schema";
+import { chapters, courses, events, lessons, studyLogReviews, studyLogs, subjects } from "@/db/schema";
 import { createUser } from "./auth";
 import { pauseFocus, resumeFocus, startFocus, stopFocus } from "./focus";
 import * as studyLogService from "./studyLogs";
@@ -12,18 +12,27 @@ const today = "2026-11-14";
 const now = new Date("2026-11-14T10:00:00.000Z");
 const sourceText = "Breadth-first search uses a queue. It visits vertices by distance from the start.";
 
-const schedule = (evidence = "Breadth-first search uses a queue.") => ({
+const schedule = () => ({
   decision: "schedule",
   reason: "The notes contain a core algorithm and a useful traversal property.",
-  reviews: [1, 2, 3, 4].map((n) => ({ front: `Question ${n}`, back: `Answer ${n}`, evidence })),
+  reviews: [
+    { front: "Breadth-first search uses a {{blank}}.", back: "queue", evidence: "Breadth-first search uses a queue." },
+    { front: "It visits vertices by {{blank}} from the start.", back: "distance", evidence: "It visits vertices by distance from the start." },
+    { front: "Breadth-first search uses a {{blank}}.", back: "queue", evidence: "Breadth-first search uses a queue." },
+    { front: "It visits vertices by {{blank}} from the start.", back: "distance", evidence: "It visits vertices by distance from the start." },
+  ],
 });
 
 const input = (clientRequestId: string, overrides: Record<string, unknown> = {}) => ({
   topic: "Breadth-first search",
   sourceText,
   clientRequestId,
+  consentToRemoteAi: true,
   ...overrides,
 });
+
+const retryInput = (clientRequestId: string, notes = sourceText) => ({ sourceText: notes, clientRequestId, consentToRemoteAi: true });
+const reviewAction = (action: "complete" | "skip" | "cancel" | "snooze", clientRequestId: string, dueOn?: string) => ({ action, clientRequestId, ...(dueOn ? { dueOn } : {}) });
 
 const evaluator = (value: unknown) => async () => value;
 
@@ -65,15 +74,44 @@ describe("PostgreSQL study-log lifecycle", () => {
   });
 
   it("keeps malformed or unavailable AI decisions recoverable and succeeds after retry", async () => {
-    const malformed = await studyLogService.submitStudyLog(fixture.db, userId, input("study-retry-001"), today, evaluator(schedule("not present in the notes")));
+    const malformed = await studyLogService.submitStudyLog(fixture.db, userId, input("study-retry-001"), today, evaluator({ ...schedule(), reviews: schedule().reviews.map((review) => ({ ...review, evidence: "not present in the notes" })) }));
     expect(malformed.log.status).toBe("retryable");
     expect(malformed.reviews).toEqual([]);
 
     const unavailable = await studyLogService.submitStudyLog(fixture.db, userId, input("study-retry-002"), today, evaluator(null));
     expect(unavailable.log.status).toBe("retryable");
-    const retried = await studyLogService.retryStudyLog(fixture.db, userId, unavailable.log.id, sourceText, today, evaluator(schedule()));
+    const retried = await studyLogService.retryStudyLog(fixture.db, userId, unavailable.log.id, retryInput("study-retry-request-001"), today, evaluator(schedule()));
     expect(retried.log.status).toBe("scheduled");
     expect(retried.reviews).toHaveLength(4);
+  });
+
+  it("marks a failed review-sequence transaction retryable without partial rows", async () => {
+    await fixture.db.execute(sql`CREATE FUNCTION reject_study_review_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN RAISE EXCEPTION 'review persistence rejected'; END;
+    $$`);
+    await fixture.db.execute(sql`CREATE TRIGGER reject_study_review_insert BEFORE INSERT ON study_log_reviews FOR EACH ROW EXECUTE FUNCTION reject_study_review_insert()`);
+
+    const failed = await studyLogService.submitStudyLog(fixture.db, userId, input("study-persist-fail-001"), today, evaluator(schedule()));
+    expect(failed.log.status).toBe("retryable");
+    expect(failed.log.aiConsentAt).toBeTruthy();
+    expect(failed.reviews).toEqual([]);
+
+    await fixture.db.execute(sql`DROP TRIGGER reject_study_review_insert ON study_log_reviews`);
+    await fixture.db.execute(sql`DROP FUNCTION reject_study_review_insert()`);
+    const recovered = await studyLogService.retryStudyLog(fixture.db, userId, failed.log.id, retryInput("study-persist-retry-001"), today, evaluator(schedule()));
+    expect(recovered.log.status).toBe("scheduled");
+    expect(recovered.reviews).toHaveLength(4);
+  });
+
+  it("replays an identical retry request and rejects a reused key with changed notes", async () => {
+    const failed = await studyLogService.submitStudyLog(fixture.db, userId, input("study-retry-replay-001"), today, evaluator(null));
+    const request = retryInput("study-retry-replay-request-001");
+    const first = await studyLogService.retryStudyLog(fixture.db, userId, failed.log.id, request, today, evaluator(schedule()));
+    const replay = await studyLogService.retryStudyLog(fixture.db, userId, failed.log.id, request, today, evaluator(null));
+    expect(replay.reviews.map((review) => review.id)).toEqual(first.reviews.map((review) => review.id));
+    await expect(studyLogService.retryStudyLog(fixture.db, userId, failed.log.id, retryInput(request.clientRequestId, "Changed BFS source."), today, evaluator(null))).rejects.toBeInstanceOf(studyLogService.EventRequestConflict);
+    const retryEvents = await fixture.db.select().from(events).where(eq(events.type, "study_log.retry_requested"));
+    expect(retryEvents).toHaveLength(1);
   });
 
   it("replays identical idempotency keys, conflicts on changed payload, and permits a fresh session", async () => {
@@ -125,23 +163,32 @@ describe("PostgreSQL study-log lifecycle", () => {
     const result = await studyLogService.submitStudyLog(fixture.db, userId, input("study-actions-001"), today, evaluator(schedule()));
     const [first, second, third, fourth] = result.reviews;
 
-    const snoozed = await studyLogService.actOnStudyLogReview(fixture.db, userId, first!.id, { action: "snooze", dueOn: "2026-11-25" }, today);
+    const snoozeRequest = reviewAction("snooze", "review-snooze-0001", "2026-11-25");
+    const snoozed = await studyLogService.actOnStudyLogReview(fixture.db, userId, first!.id, snoozeRequest, today);
+    expect(await studyLogService.actOnStudyLogReview(fixture.db, userId, first!.id, snoozeRequest, today)).toEqual(snoozed);
     expect(snoozed).toMatchObject({ scheduledOn: "2026-11-17", dueOn: "2026-11-25", status: "pending" });
-    await expect(studyLogService.actOnStudyLogReview(fixture.db, userId, second!.id, { action: "snooze", dueOn: today }, today)).rejects.toBeInstanceOf(studyLogService.StudyLogConflict);
+    await expect(studyLogService.actOnStudyLogReview(fixture.db, userId, second!.id, reviewAction("snooze", "review-snooze-invalid", today), today)).rejects.toBeInstanceOf(studyLogService.StudyLogConflict);
     expect((await studyLogService.dueStudyLogReviews(fixture.db, userId, "2026-11-24")).map((review) => review.id)).toEqual([second!.id]);
 
-    const done = await studyLogService.actOnStudyLogReview(fixture.db, userId, first!.id, { action: "complete" }, "2026-11-25");
+    const completeRequest = reviewAction("complete", "review-complete-0001");
+    const done = await studyLogService.actOnStudyLogReview(fixture.db, userId, first!.id, completeRequest, "2026-11-25");
+    expect(await studyLogService.actOnStudyLogReview(fixture.db, userId, first!.id, completeRequest, "2026-11-25")).toEqual(done);
+    expect(await studyLogService.actOnStudyLogReview(fixture.db, userId, first!.id, reviewAction("complete", "review-complete-repeat"), "2026-11-25")).toEqual(done);
     expect(done).toMatchObject({ status: "done", doneOn: "2026-11-25", scheduledOn: "2026-11-17" });
-    expect((await studyLogService.actOnStudyLogReview(fixture.db, userId, second!.id, { action: "skip" }, today)).status).toBe("skipped");
-    expect((await studyLogService.actOnStudyLogReview(fixture.db, userId, third!.id, { action: "cancel" }, today)).status).toBe("canceled");
-    expect((await studyLogService.actOnStudyLogReview(fixture.db, userId, fourth!.id, { action: "complete" }, today)).status).toBe("done");
-    await expect(studyLogService.actOnStudyLogReview(fixture.db, "different-owner", first!.id, { action: "complete" }, today)).rejects.toBeInstanceOf(studyLogService.StudyLogNotFound);
+    expect((await studyLogService.actOnStudyLogReview(fixture.db, userId, second!.id, reviewAction("skip", "review-skip-0001"), today)).status).toBe("skipped");
+    expect((await studyLogService.actOnStudyLogReview(fixture.db, userId, third!.id, reviewAction("cancel", "review-cancel-0001"), today)).status).toBe("canceled");
+    expect((await studyLogService.actOnStudyLogReview(fixture.db, userId, fourth!.id, reviewAction("complete", "review-complete-0002"), today)).status).toBe("done");
+    await expect(studyLogService.actOnStudyLogReview(fixture.db, "different-owner", first!.id, reviewAction("complete", "review-other-owner"), today)).rejects.toBeInstanceOf(studyLogService.StudyLogNotFound);
+    const reviewEvents = await fixture.db.select().from(events).where(eq(events.type, "study_log.review_acted"));
+    expect(reviewEvents).toHaveLength(6);
   });
 
   it("reclaims a processing attempt after its five-minute lease and leaves focus transitions independent", async () => {
     const pending = await studyLogService.submitStudyLog(fixture.db, userId, input("study-lease-001"), today, evaluator(null));
+    await fixture.db.update(studyLogs).set({ status: "processing", analysisStartedAt: new Date().toISOString() }).where(eq(studyLogs.id, pending.log.id));
+    await expect(studyLogService.retryStudyLog(fixture.db, userId, pending.log.id, retryInput("study-active-lease-001"), today, evaluator(schedule()))).rejects.toBeInstanceOf(studyLogService.StudyLogConflict);
     await fixture.db.update(studyLogs).set({ status: "processing", analysisStartedAt: "2026-11-14T09:50:00.000Z" }).where(eq(studyLogs.id, pending.log.id));
-    const recovered = await studyLogService.retryStudyLog(fixture.db, userId, pending.log.id, sourceText, today, evaluator(schedule()));
+    const recovered = await studyLogService.retryStudyLog(fixture.db, userId, pending.log.id, retryInput("study-lease-retry-001"), today, evaluator(schedule()));
     expect(recovered.log.status).toBe("scheduled");
 
     const before = await fixture.db.select().from(studyLogReviews).where(eq(studyLogReviews.studyLogId, recovered.log.id));

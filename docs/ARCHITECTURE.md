@@ -35,8 +35,8 @@ browser ──HTTP──▶ route handler / server component
 
 ## Key design rules
 
-1. **Event sourcing.** Every mutation appends to the `events` table; XP / score / gold / gems ledgers are *projections*
-   that can be rebuilt (`replayAll`) and compared (`npm run replay`). Projections run in the same transaction as the event.
+1. **Event sourcing.** Every canonical domain mutation appends to the `events` table; XP / score / gold / gems ledgers are *projections*
+   that can be rebuilt (`replayAll`) and compared (`npm run replay`). Projections run in the same transaction as the event. Derived presentation rows, such as materialized reminders regenerated from their source records, are not independent domain mutations.
 2. **One transaction per domain operation**, taken through `withUserTransaction` (`src/db/client.ts`). It holds a
    per-user advisory lock, so two requests for the same user never interleave a read-modify-write. Nested calls only open
    a savepoint (the lock is re-entrant), which keeps partial rollback working.
@@ -66,15 +66,19 @@ progress rules. Finishing earlier records elapsed time without automatically com
 
 Study logs are a user-triggered workflow, separate from focus sessions and the existing review-card scheduler. The
 `/study-log` page and authenticated `/api/study-logs` routes persist the submitted topic, source notes/transcript, and
-optional course references before calling the existing guarded AI adapter; the network call runs outside the database
-transaction. `src/server/studyLogs.ts` owns validation, owner checks, retries, review actions, and the atomic writes to
-`study_logs` and `study_log_reviews`, declared in `src/db/schema.ts` and created by migration
-`src/db/migrations-pg/0005_study_logs.up.sql`. The decision schema requires
-exactly four prompts for a schedule, and every prompt must include evidence found in the submitted source. The server
-computes date-only review dates at +3, +7, +14, and +30 calendar days, then stores the decision and all reviews atomically
-under the owning user's transaction. Invalid or unavailable AI results leave a retryable study log without partial
-reviews. `app/(app)/forge/StudyLogReviews.tsx` reads due reviews directly, so reminder settings never hide them; when
-enabled, `src/server/reminders.ts` offers due reviews before routine anchors and applies the existing per-day cap.
+optional course references. A per-session consent checkbox is required before any study text can reach the configured
+AI provider; the provider receives only topic and source text, while course, lesson/video, and chapter references stay
+local. The network call runs outside the database transaction. `src/server/studyLogs.ts` owns validation, owner checks,
+retries, review actions, and the atomic writes to `study_logs` and `study_log_reviews`, declared in `src/db/schema.ts`
+and created by migrations `0005_study_logs.up.sql` and `0006_study_log_ai_consent.up.sql`. A schedule requires exactly
+four cloze prompts: each has one `{{blank}}`, and filling it with the answer must reproduce a short source excerpt
+exactly after Unicode and whitespace normalization. This prevents unsupported facts from appearing in either side of a
+review card. The server computes date-only review dates at +3, +7, +14, and +30 calendar days, then stores the decision
+and all reviews atomically under the owning user's transaction. Failed analysis or persistence leaves a retryable log;
+if the database cannot record that recovery state, the five-minute analysis lease permits a later retry. Retry requests
+and review actions use replay-safe `clientRequestId` events. `app/(app)/forge/StudyLogReviews.tsx` reads due reviews
+directly, so reminder settings never hide them; enabled reminders are materialized presentation rows from due reviews,
+are offered before routine anchors, and use the existing per-day cap.
 
 ## Where things live
 

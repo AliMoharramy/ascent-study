@@ -118,7 +118,7 @@
 | F-ERR-04 | Forge Artifacts | ثبت محصولات یادگیری (برگه خلاصه، سؤال خودساخته، توضیح)؛ پیوند به فصل؛ Markdown ساده | P1 | R2 |
 | F-ERR-05 | Weak‑Point Hunter | فهرست ۱۰ فصل/علت ضعیف؛ پیشنهاد مأموریت | P2 | R4 |
 | F-ERR-06 | دورهای مرور (TOC ۳ دور) | زمان‌بندی خودکار دور ۲ و ۳ | P2 | R3 |
-| F-ERR-07 | ثبت مطالعه و برنامه‌ریزی AI برای مرور | ثبت یادداشت/رونوشت با موضوع و پیوند اختیاری به دوره/جلسه/فصل؛ AI فقط از متن ثبت‌شده استفاده می‌کند و تصمیم «زمان‌بندی/بدون مرور/نیازمند محتوای بیشتر» می‌دهد؛ چهار مرور در روزهای تقویمی +۳، +۷، +۱۴ و +۳۰؛ تلاش مجدد پس از خطا؛ اقدام‌های انجام‌شده، تعویق، رد و لغو در Forge | P1 | R4 |
+| F-ERR-07 | AI-assisted study logging and review planning | Save notes/transcripts with a topic and optional course, lesson/video, or chapter reference; require per-session consent before sending topic and source text to the configured AI provider; keep references local; accept only four cloze reviews whose answers reconstruct source excerpts; choose schedule, no sequence, or needs material; schedule for calendar days +3/+7/+14/+30; support retry after failure and complete, snooze, skip, or cancel actions in Forge | P1 | R4 |
 
 ## M7 — عادت‌ها و ستون‌ها
 

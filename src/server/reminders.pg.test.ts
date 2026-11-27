@@ -15,7 +15,12 @@ const sourceText = "Breadth-first search uses a queue and visits vertices by dis
 const decision = {
   decision: "schedule" as const,
   reason: "The notes contain a useful algorithm and traversal rule.",
-  reviews: [1, 2, 3, 4].map((n) => ({ front: `Question ${n}`, back: `Answer ${n}`, evidence: "Breadth-first search uses a queue" })),
+  reviews: [
+    { front: "Breadth-first search uses a {{blank}}", back: "queue", evidence: "Breadth-first search uses a queue" },
+    { front: "and visits vertices by {{blank}}.", back: "distance", evidence: "and visits vertices by distance." },
+    { front: "Breadth-first search uses a {{blank}}", back: "queue", evidence: "Breadth-first search uses a queue" },
+    { front: "and visits vertices by {{blank}}.", back: "distance", evidence: "and visits vertices by distance." },
+  ],
 };
 
 async function addLog(dueOffset: 3 | 7 | 14 | 30, requestId: string) {
@@ -24,6 +29,7 @@ async function addLog(dueOffset: 3 | 7 | 14 | 30, requestId: string) {
     sourceText,
     studiedOn: addDaysIso(today, -dueOffset),
     clientRequestId: requestId,
+    consentToRemoteAi: true,
   }, today, async () => decision);
 }
 

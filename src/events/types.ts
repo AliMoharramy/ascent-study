@@ -120,6 +120,7 @@ export const EVENT_TYPES = [
   "personal_task.reopened",
   "study_log.created",
   "study_log.decision_recorded",
+  "study_log.retry_requested",
   "study_log.review_acted",
 ] as const;
 

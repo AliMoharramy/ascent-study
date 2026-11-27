@@ -5,7 +5,7 @@ import { retryStudyLog } from "@/server/studyLogs";
 
 export const POST = api(async ({ db, userId, req, params, session }) => {
   const id = z.string().min(1).parse((await params).id);
-  const { sourceText } = studyLogRetrySchema.parse(await body(req));
+  const input = studyLogRetrySchema.parse(await body(req));
   const today = currentStudyGameDay(new Date(), session.user.timezone, session.user.rolloverHour);
-  return await retryStudyLog(db, userId, id, sourceText, today);
+  return await retryStudyLog(db, userId, id, input, today);
 }, { mutating: true });

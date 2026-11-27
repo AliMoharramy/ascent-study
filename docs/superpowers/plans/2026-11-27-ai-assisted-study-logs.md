@@ -164,3 +164,11 @@
 - [x] **Step 5: Run the local smoke test** on the disposable production build and inspect `git diff --check`; confirm no timer/focus implementation files were changed and review the complete diff for unrelated changes. Result: smoke passed, diff check is clean, and the rendered form enables after topic/source input.
 - [x] **Step 6: Commit** docs and any final fixes with `docs: document AI-assisted study reviews` (or a focused fix commit if verification requires one).
 - [ ] **Step 7: Push `codex/ai-study-log-review-planner`, open a PR targeting `main` with `Closes #21`, then close issue #21 as explicitly requested.**
+
+### Code-review follow-up: privacy, grounding, and recovery
+
+- [x] Require per-submission and per-retry consent before study topic/source text may reach the configured remote AI provider; persist the consent timestamp and keep course, lesson/video, and chapter references local.
+- [x] Require each generated review to contain one cloze marker whose answer reconstructs its exact source excerpt after Unicode and whitespace normalization.
+- [x] Give retry and Forge review actions request IDs, event-backed replay protection, same-state idempotency, and a hash-only retry event payload.
+- [x] Recover from decision/review persistence failures with a retryable state and expose a retry after a stalled five-minute processing lease.
+- [x] Verify the follow-up against the disposable local PostgreSQL database only: `npm test` (21 files, 212 tests), PostgreSQL schema/study-log/reminder suites (10 + 10 + 3 tests), typecheck, lint, production build, and local smoke.

@@ -457,6 +457,7 @@ export const studyLogs = pgTable("study_logs", {
   decision: text("decision").$type<StudyLogDecisionKind>(),
   reason: text("reason").notNull().default(""),
   analysisStartedAt: ts("analysis_started_at"),
+  aiConsentAt: ts("ai_consent_at"),
   createdAt: ts("created_at").notNull(),
   updatedAt: ts("updated_at").notNull(),
 });

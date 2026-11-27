@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { STUDY_LOG_ANALYSIS_LEASE_MS } from "@/domain/studyLog";
 import { apiFetch, requestId } from "@/ui/client";
 import { Chip, EmptyState, Eyebrow, cx } from "@/ui/components";
 import { Icon } from "@/ui/icons";
@@ -10,22 +11,28 @@ type LogStatus = "pending" | "processing" | "retryable" | "needs_material" | "no
 type ReviewStatus = "pending" | "done" | "skipped" | "canceled";
 type Review = { id: string; checkpoint: number; offsetDays: number; front: string; back: string; scheduledOn: string; dueOn: string; status: ReviewStatus; doneOn: string | null };
 type SummaryReview = Pick<Review, "id" | "checkpoint" | "offsetDays" | "scheduledOn" | "dueOn" | "status">;
-type Log = { id: string; userId: string; clientRequestId: string; topic: string; courseId: string | null; lessonId: string | null; chapterId: string | null; studiedOn: string; sourceText: string; status: LogStatus; decision: "schedule" | "no_sequence" | "needs_material" | null; reason: string; createdAt: string; updatedAt: string };
+type Log = { id: string; userId: string; clientRequestId: string; topic: string; courseId: string | null; lessonId: string | null; chapterId: string | null; studiedOn: string; sourceText: string; status: LogStatus; decision: "schedule" | "no_sequence" | "needs_material" | null; reason: string; analysisStartedAt: string | null; createdAt: string; updatedAt: string };
 type Bundle = { log: Log; reviews: Review[] };
-type Summary = Pick<Log, "id" | "topic" | "courseId" | "lessonId" | "chapterId" | "studiedOn" | "status" | "decision" | "reason" | "createdAt"> & { reviews: SummaryReview[] };
+type Summary = Pick<Log, "id" | "topic" | "courseId" | "lessonId" | "chapterId" | "studiedOn" | "status" | "decision" | "reason" | "analysisStartedAt" | "createdAt"> & { reviews: SummaryReview[] };
 type Course = { id: string; title: string; subjectId: string };
 type Lesson = { id: string; title: string; courseId: string; chapterIds: string[] };
 type Chapter = { id: string; no: number; title: string; subjectId: string };
 
 const offsets = [3, 7, 14, 30];
 const checkpointNames = ["first recall", "reinforce", "consolidate", "retain"];
-const statusCopy: Record<LogStatus, string> = {
-  pending: "Saved",
-  processing: "Analyzing",
-  retryable: "Retry available",
-  needs_material: "Needs more notes",
-  no_sequence: "No sequence",
-  scheduled: "Reviews scheduled",
+const statusPresentation: Record<LogStatus, {
+  label: string;
+  tone: "yellow" | "mint" | "coral" | "purple" | "lime";
+  dotClass: string;
+  createNotice: string;
+  retryNotice: string;
+}> = {
+  pending: { label: "Saved", tone: "purple", dotClass: "bg-purple", createNotice: "Saved. Review planning is still in progress.", retryNotice: "Review planning is still in progress." },
+  processing: { label: "Analyzing", tone: "purple", dotClass: "bg-purple", createNotice: "Saved. Review planning is still in progress.", retryNotice: "Review planning is still in progress." },
+  retryable: { label: "Retry available", tone: "coral", dotClass: "bg-coral", createNotice: "Saved. The review plan could not be verified; edit the notes and retry.", retryNotice: "Review planning is unavailable. You can edit the notes and retry again." },
+  needs_material: { label: "Needs more notes", tone: "yellow", dotClass: "bg-yellow", createNotice: "Saved. Add more notes whenever you are ready to try again.", retryNotice: "More notes are needed before useful questions can be made." },
+  no_sequence: { label: "No sequence", tone: "mint", dotClass: "bg-purple", createNotice: "Saved. The notes do not need a fixed review sequence.", retryNotice: "The notes are saved without a fixed sequence." },
+  scheduled: { label: "Reviews scheduled", tone: "lime", dotClass: "bg-lime", createNotice: "Four reviews are set from the material you shared.", retryNotice: "Four new review dates are ready." },
 };
 
 function summarize({ log, reviews }: Bundle): Summary {
@@ -39,23 +46,17 @@ function summarize({ log, reviews }: Bundle): Summary {
     status: log.status,
     decision: log.decision,
     reason: log.reason,
+    analysisStartedAt: log.analysisStartedAt,
     createdAt: log.createdAt,
     reviews: reviews.map(({ id, checkpoint, offsetDays, scheduledOn, dueOn, status }) => ({ id, checkpoint, offsetDays, scheduledOn, dueOn, status })),
   };
-}
-
-function statusTone(status: LogStatus): "yellow" | "mint" | "coral" | "purple" | "lime" {
-  if (status === "scheduled") return "lime";
-  if (status === "retryable") return "coral";
-  if (status === "needs_material") return "yellow";
-  if (status === "no_sequence") return "mint";
-  return "purple";
 }
 
 export function StudyLogClient(p: { today: string; courses: Course[]; lessons: Lesson[]; chapters: Chapter[]; recent: Summary[] }) {
   const router = useRouter();
   const [topic, setTopic] = useState("");
   const [sourceText, setSourceText] = useState("");
+  const [consentToRemoteAi, setConsentToRemoteAi] = useState(false);
   const [studiedOn, setStudiedOn] = useState(p.today);
   const [courseId, setCourseId] = useState("");
   const [lessonId, setLessonId] = useState("");
@@ -71,11 +72,22 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
   const [retrySource, setRetrySource] = useState<Record<string, string>>({});
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [historyNotice, setHistoryNotice] = useState("");
+  const [leaseClock, setLeaseClock] = useState(() => Date.now());
 
   const recent = useMemo(() => {
     const all = localSummary ? [localSummary, ...p.recent.filter((item) => item.id !== localSummary.id)] : p.recent;
     return all.slice(0, 20);
   }, [localSummary, p.recent]);
+  useEffect(() => {
+    const retryAt = recent
+      .filter((item) => item.status === "processing" && item.analysisStartedAt)
+      .map((item) => new Date(item.analysisStartedAt!).getTime() + STUDY_LOG_ANALYSIS_LEASE_MS)
+      .filter((at) => Number.isFinite(at) && at > Date.now())
+      .sort((a, b) => a - b)[0];
+    if (!retryAt) return;
+    const timer = setTimeout(() => setLeaseClock(Date.now()), Math.min(retryAt - Date.now() + 25, 2_147_000_000));
+    return () => clearTimeout(timer);
+  }, [leaseClock, recent]);
   const selectedCourse = p.courses.find((course) => course.id === courseId);
   const selectedLesson = p.lessons.find((lesson) => lesson.id === lessonId);
   const availableLessons = p.lessons.filter((lesson) => !courseId || lesson.courseId === courseId);
@@ -101,14 +113,16 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
           ...(lessonId ? { lessonId } : {}),
           ...(chapterId ? { chapterId } : {}),
           clientRequestId: requestId(),
+          consentToRemoteAi: true,
         },
       });
       setDetails((current) => ({ ...current, [result.log.id]: result }));
       setLocalSummary(summarize(result));
       setSelectedId(result.log.id);
-      setNotice(result.log.status === "scheduled" ? "Four reviews are set from the material you shared." : result.log.status === "no_sequence" ? "Saved. The notes do not need a fixed review sequence." : result.log.status === "needs_material" ? "Saved. Add more notes whenever you are ready to try again." : result.log.status === "retryable" ? "Saved. The review plan could not be verified; edit the notes and retry." : "Saved. Review planning is still in progress.");
+      setNotice(statusPresentation[result.log.status].createNotice);
       setTopic("");
       setSourceText("");
+      setConsentToRemoteAi(false);
       setStudiedOn(p.today);
       setCourseId("");
       setLessonId("");
@@ -118,6 +132,7 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
       setError(cause instanceof Error ? cause.message : "Study log could not be saved.");
     } finally {
       setBusy(false);
+      setConsentToRemoteAi(false);
     }
   }
 
@@ -151,11 +166,13 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
     setDetailError("");
     setHistoryNotice("");
     try {
-      const result = await apiFetch<Bundle>(`/api/study-logs/${encodeURIComponent(id)}/retry`, { body: { sourceText: source } });
+      const result = await apiFetch<Bundle>(`/api/study-logs/${encodeURIComponent(id)}/retry`, {
+        body: { sourceText: source, clientRequestId: requestId(), consentToRemoteAi: true },
+      });
       setDetails((current) => ({ ...current, [id]: result }));
       setRetrySource((current) => ({ ...current, [id]: result.log.sourceText }));
       setLocalSummary(summarize(result));
-      setHistoryNotice(result.log.status === "scheduled" ? "Four new review dates are ready." : result.log.status === "needs_material" ? "More notes are needed before useful questions can be made." : result.log.status === "no_sequence" ? "The notes are saved without a fixed sequence." : "Review planning is still unavailable. You can edit the notes and retry again.");
+      setHistoryNotice(statusPresentation[result.log.status].retryNotice);
       router.refresh();
     } catch (cause) {
       setDetailError(cause instanceof Error ? cause.message : "The review plan could not be retried.");
@@ -223,7 +240,7 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
                 </select>
               </label>
               <label className="block">
-                <span className="label">Lesson <span className="font-normal text-muted">· optional</span></span>
+                <span className="label">Lesson / video <span className="font-normal text-muted">· optional</span></span>
                 <select className="field" value={lessonId} onChange={(event) => { setLessonId(event.target.value); setChapterId(""); }}>
                   <option value="">No lesson</option>
                   {availableLessons.map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
@@ -243,11 +260,16 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
               </label>
             </div>
 
+            <label className="flex items-start gap-3 rounded-2xl border border-yellow/40 bg-yellow/10 p-3 text-body-s text-muted">
+              <input className="mt-1 accent-yellow" type="checkbox" required checked={consentToRemoteAi} onChange={(event) => setConsentToRemoteAi(event.target.checked)} />
+              <span>If AI review planning is enabled, your topic and notes or transcript will be sent to this app’s configured AI provider. Course, lesson, and chapter links stay in your account. Agree before submitting to request a review plan.</span>
+            </label>
+
             {error && <p role="alert" className="rounded-2xl border border-coral/50 bg-coral/10 px-4 py-3 text-body-s font-bold text-coral-ink">{error}</p>}
             {notice && <p role="status" className="rounded-2xl border border-mint/40 bg-mint/10 px-4 py-3 text-body-s font-bold text-mint-ink">{notice}</p>}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
               <p className="max-w-md text-caption text-muted">Questions are saved only when all four can be grounded in your notes.</p>
-              <button className="btn-accent min-w-40 justify-center" disabled={busy || topic.trim().length < 2 || !sourceText.trim()}>
+              <button className="btn-accent min-w-40 justify-center" disabled={busy || topic.trim().length < 2 || !sourceText.trim() || !consentToRemoteAi}>
                 <Icon name={busy ? "clock" : "arrow"} size={16} /> {busy ? "Building review path…" : "Save study log"}
               </button>
             </div>
@@ -270,13 +292,13 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
               {recent.map((item) => (
                 <li key={item.id} className="overflow-hidden rounded-2xl border border-line bg-surface-2">
                   <button type="button" aria-expanded={selectedId === item.id} onClick={() => void toggleDetails(item.id)} className="group flex w-full items-start gap-3 p-4 text-start transition-colors hover:bg-surface-1 focus-visible:outline-none motion-reduce:transition-none">
-                    <span aria-hidden="true" className={cx("mt-1 h-2.5 w-2.5 shrink-0 rounded-full", item.status === "scheduled" ? "bg-lime" : item.status === "retryable" ? "bg-coral" : item.status === "needs_material" ? "bg-yellow" : "bg-purple")} />
+                    <span aria-hidden="true" className={cx("mt-1 h-2.5 w-2.5 shrink-0 rounded-full", statusPresentation[item.status].dotClass)} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-extrabold" dir="auto">{item.topic}</span>
                       <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-muted">
                         <span className="font-mono">{item.studiedOn}</span>
                         <span aria-hidden="true">·</span>
-                        <span>{statusCopy[item.status]}</span>
+                        <span>{statusPresentation[item.status].label}</span>
                         {item.reviews.length > 0 && <><span aria-hidden="true">·</span><span>{item.reviews.filter((review) => review.status === "pending").length} pending</span></>}
                       </span>
                     </span>
@@ -291,7 +313,8 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
                         bundle={details[item.id]!}
                         retrySource={retrySource[item.id] ?? details[item.id]!.log.sourceText}
                         onSourceChange={(value) => setRetrySource((current) => ({ ...current, [item.id]: value }))}
-                        onRetry={() => void retry(item.id)}
+                        key={item.id}
+                        onRetry={() => retry(item.id)}
                         retrying={retryingId === item.id}
                       />}
                     </div>
@@ -308,16 +331,27 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
   );
 }
 
-function LogDetail(p: { bundle: Bundle; retrySource: string; onSourceChange: (value: string) => void; onRetry: () => void; retrying: boolean }) {
+function LogDetail(p: { bundle: Bundle; retrySource: string; onSourceChange: (value: string) => void; onRetry: () => Promise<void>; retrying: boolean }) {
   const { log, reviews } = p.bundle;
-  const canRetry = log.status === "retryable" || log.status === "needs_material";
+  const leaseExpired = !log.analysisStartedAt || !Number.isFinite(Date.parse(log.analysisStartedAt)) || Date.now() - Date.parse(log.analysisStartedAt) >= STUDY_LOG_ANALYSIS_LEASE_MS;
+  const canRetry = log.status === "retryable" || log.status === "needs_material" || (log.status === "processing" && leaseExpired);
+  const [retryConsent, setRetryConsent] = useState(false);
+
+  async function retryWithConsent() {
+    try {
+      await p.onRetry();
+    } finally {
+      setRetryConsent(false);
+    }
+  }
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Chip tone={statusTone(log.status)}>{statusCopy[log.status]}</Chip>
+        <Chip tone={statusPresentation[log.status].tone}>{statusPresentation[log.status].label}</Chip>
         {log.decision === "schedule" && <span className="text-caption text-muted">4 fixed checkpoints</span>}
       </div>
       {log.reason && <p className="text-body-s text-muted">{log.reason}</p>}
+      {log.status === "processing" && !canRetry && <p role="status" className="text-caption text-muted">An analysis attempt is still active. Retry becomes available after its five-minute lease expires.</p>}
 
       {reviews.length > 0 && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Scheduled review dates">
@@ -343,9 +377,13 @@ function LogDetail(p: { bundle: Bundle; retrySource: string; onSourceChange: (va
             <span className="label">Edit notes and try again</span>
             <textarea className="field min-h-32 resize-y leading-relaxed" maxLength={20_000} value={p.retrySource} onChange={(event) => p.onSourceChange(event.target.value)} dir="auto" />
           </label>
+          <label className="flex items-start gap-3 rounded-xl border border-yellow/40 bg-yellow/10 p-3 text-body-s text-muted">
+            <input className="mt-1 accent-yellow" type="checkbox" required checked={retryConsent} onChange={(event) => setRetryConsent(event.target.checked)} />
+            <span>Submitting this retry sends the edited notes or transcript to this app’s configured AI provider if AI review planning is enabled.</span>
+          </label>
           <div className="flex items-center justify-between gap-2">
             <span className="font-mono text-caption text-muted">{p.retrySource.length.toLocaleString()} / 20,000</span>
-            <button type="button" className="btn-accent" disabled={p.retrying || !p.retrySource.trim()} onClick={p.onRetry}>
+            <button type="button" className="btn-accent" disabled={p.retrying || !p.retrySource.trim() || !retryConsent} onClick={() => void retryWithConsent()}>
               <Icon name={p.retrying ? "clock" : "arrow"} size={15} /> {p.retrying ? "Retrying…" : "Retry review plan"}
             </button>
           </div>

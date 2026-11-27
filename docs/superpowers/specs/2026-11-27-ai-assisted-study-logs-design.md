@@ -2,7 +2,7 @@
 
 ## Status
 
-Design approved for spec review; implementation has not started.
+Design approved and implemented in the feature branch for issue #21.
 
 ## Goal
 
@@ -11,9 +11,9 @@ Let a user record what they explicitly studied, provide the source material, and
 ## User experience
 
 - Add a dedicated **Log study** route reachable from the app navigation, command palette, and a Today entry point outside the timer.
-- The form captures a required topic, optional course/lesson/chapter reference, a study game day defaulting to the user’s current game day, and required notes or transcript. Validate private courses against the authenticated owner, permit shared catalog courses, verify that a lesson belongs to its selected course, and verify chapter links against the shared catalog and any lesson-to-chapter link.
+- The form captures a required topic, optional course/lesson-video/chapter reference, a study game day defaulting to the user’s current game day, and required notes or transcript. Before each submission or retry, require explicit consent to send the topic and notes/transcript to the configured remote AI provider when AI review planning is enabled; references remain local. Validate private courses against the authenticated owner, permit shared catalog courses, verify that a lesson belongs to its selected course, and verify chapter links against the shared catalog and any lesson-to-chapter link.
 - Save the log and its source before calling AI. Show an in-progress state while the decision is being evaluated.
-- AI returns one of three outcomes: schedule reviews, no sequence with a reason, or insufficient source material with a request for more detail. It generates question/answer pairs only from the supplied material. Do not call AI if source material is blank.
+- AI returns one of three outcomes: schedule reviews, no sequence with a reason, or insufficient source material with a request for more detail. Scheduled entries are cloze prompts with exactly one `{{blank}}`; inserting the exact answer into the prompt must reconstruct its source excerpt. Do not call AI if source material is blank or remote-AI consent is absent.
 - A scheduled log has four review checkpoints initially due at +3, +7, +14, and +30 game days from the selected study day. The UI displays those dates and keeps the source and status history available.
 - Show due and overdue study reviews alongside the existing Forge review experience. Each checkpoint can be completed, snoozed/rescheduled, skipped, or canceled. A snooze changes its current due date while preserving the originally scheduled date and interval.
 - The existing reminders surface can include due study reviews when reminders are enabled. Reminder candidates share the user’s configured per-day cap. The Forge queue remains the source of truth and always shows due reviews, even when reminders are off or capped.
@@ -24,16 +24,16 @@ Let a user record what they explicitly studied, provide the source material, and
 
 Add two PostgreSQL tables and matching Drizzle schema entries:
 
-- `study_logs`: owner, idempotency key, topic, optional course/lesson/chapter references, study game day, source material, AI decision/reason, lifecycle status, and timestamps. Enforce a unique `(user_id, client_request_id)` key. A repeated key with the same payload returns the existing log; reusing it with different content is a conflict. A fresh request key creates a separate intentional study session, including for the same topic and day.
+- `study_logs`: owner, idempotency key, topic, optional course/lesson-video/chapter references, study game day, source material, AI decision/reason, lifecycle status, explicit-consent timestamp, and timestamps. Enforce a unique `(user_id, client_request_id)` key. A repeated key with the same payload returns the existing log; reusing it with different content is a conflict. A fresh request key creates a separate intentional study session, including for the same topic and day.
 - `study_log_reviews`: owner, parent study log, sequence position/offset, source-grounded front/back, original scheduled date, mutable current due date, status, and completion timestamps. Enforce one row per log and interval. Keep this separate from `review_cards`, whose adaptive answer scheduler must not move these fixed checkpoints.
 
-Every study-log and review read and mutation filters by the authenticated owner. Private course references are owner-checked; shared catalog records are validated against the shared catalog. Nested lesson and chapter references are checked for consistency before insertion. Writes to a log decision and its four review rows occur in one transaction. Record domain events for study-log decisions and review actions using the existing event store.
+Every study-log and review read and mutation filters by the authenticated owner. Private course references are owner-checked; shared catalog records are validated against the shared catalog. Nested lesson and chapter references are checked for consistency before insertion. Writes to a log decision and its four review rows occur in one transaction. Record domain events for study-log decisions, retry requests, and review actions using the existing event store. Retry and action requests use replay-safe keys; retry events retain a source hash and length rather than duplicating notes.
 
 ### Decision lifecycle
 
 1. Persist the submitted log first with a pending analysis status.
 2. Claim analysis once per log so retries cannot launch duplicate concurrent AI requests. Replays return the existing state. A stale in-progress attempt can be retried.
-3. Send only the user-submitted topic/reference and source material through the existing guarded AI adapter. Validate a strict response schema. The prompt explicitly forbids outside facts and requires source-grounded Q/A pairs.
+3. After explicit consent, send only the user-submitted topic and source material through the existing guarded AI adapter; course, lesson/video, and chapter references stay local. Validate a strict response schema. The prompt explicitly forbids outside facts and requires cloze content reconstructing a source excerpt.
 4. For a schedule decision, ignore any model-proposed dates. Calculate all four due dates server-side with date-only game-day arithmetic from `studiedOn`, then atomically persist the decision and four tasks.
 5. For a no-sequence or insufficient-material decision, persist its reason and create no review tasks. Insufficient-material logs can be edited and retried.
 6. If AI is disabled, capped, unavailable, times out, or returns invalid data, retain the source and mark the log retryable. Do not claim that reviews exist until the database transaction succeeds. Do not use a local model fallback to guess the decision.
@@ -57,8 +57,8 @@ The client supplies a request id for creation retries; key reuse with a differen
 
 ## Failure handling and privacy
 
-- Store source text only in the owner’s study-log record and transmit it to the configured AI provider only after explicit submission or retry.
-- If an AI call fails after the initial insert, preserve the log and report a retryable state. If persistence of the decision or tasks fails, the transaction leaves no partial sequence and the log remains recoverable.
+- Store source text only in the owner’s study-log record and transmit it to the configured AI provider only after explicit per-submission or per-retry consent.
+- If an AI call fails after the initial insert, preserve the log and report a retryable state. If persistence of the decision or tasks fails, the transaction leaves no partial sequence and a second transaction marks it retryable; when the database is still unavailable, the five-minute lease makes it recoverable later.
 - The UI must distinguish `processing`, `retryable`, `needs_material`, `no_sequence`, and `scheduled` states and never present an unconfirmed sequence as created.
 - Reminder settings affect only reminder creation. They never filter the Forge due queue.
 
