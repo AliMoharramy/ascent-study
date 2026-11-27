@@ -31,8 +31,10 @@ export function localParts(date: Date, timeZone = DEFAULT_TZ) {
 
 /** The game day (ISO date, Gregorian) an instant belongs to. */
 export function gameDay(date: Date, timeZone = DEFAULT_TZ, rolloverHour = DEFAULT_ROLLOVER_HOUR): string {
-  const shifted = new Date(date.getTime() - rolloverHour * 3_600_000);
-  return localParts(shifted, timeZone).date;
+  const local = localParts(date, timeZone);
+  const day = new Date(`${local.date}T00:00:00.000Z`);
+  if (local.hour < rolloverHour) day.setUTCDate(day.getUTCDate() - 1);
+  return day.toISOString().slice(0, 10);
 }
 
 /** Offset in minutes of `timeZone` from UTC at a given instant. */

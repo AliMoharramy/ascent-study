@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { addDaysIso } from "@/i18n/jalali";
 import { createTestDb, type TestDb } from "@/db/testing";
 import { reminders } from "@/db/schema";
+import { currentStudyGameDay } from "@/domain/studyLog";
 import { createUser } from "./auth";
 import { ensureDefaultConfig, updateConfig } from "./config";
 import { dueStudyLogReviews, submitStudyLog } from "./studyLogs";
@@ -75,5 +76,21 @@ describe("PostgreSQL reminders with fixed study reviews", () => {
     expect(created).toHaveLength(2);
     expect(created.every((reminder) => reminder.anchorKey.startsWith("study-review:"))).toBe(true);
     expect(await dueStudyLogReviews(fixture.db, userId, today)).toHaveLength(6);
+  });
+
+  it("surfaces a review on the correct local game day after the DST clock change", async () => {
+    const dstToday = currentStudyGameDay(new Date("2026-03-08T08:30:00Z"), "America/New_York", 4);
+    await updateConfig(fixture.db, userId, { reminders: { enabled: true, maxPerDay: 1 } }, "DST study review");
+    const log = await submitStudyLog(fixture.db, userId, {
+      topic: "DST study reminder",
+      sourceText,
+      studiedOn: addDaysIso(dstToday, -3),
+      clientRequestId: "reminder-study-dst-003",
+      consentToRemoteAi: true,
+    }, dstToday, async () => decision);
+
+    expect(log.reviews[0]?.scheduledOn).toBe(dstToday);
+    expect((await dueStudyLogReviews(fixture.db, userId, dstToday)).map((review) => review.studyLogId)).toEqual([log.log.id]);
+    expect(await ensureTodayReminders(fixture.db, userId, dstToday)).toBe(1);
   });
 });

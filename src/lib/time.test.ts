@@ -15,6 +15,11 @@ describe("time / game day", () => {
     expect(gameDay(new Date("2026-11-14T00:29:00Z"))).toBe("2026-11-13");
   });
 
+  it("uses local wall-clock rollover through a daylight-saving transition", () => {
+    expect(gameDay(new Date("2026-03-08T07:30:00Z"), "America/New_York", 4)).toBe("2026-03-07");
+    expect(gameDay(new Date("2026-03-08T08:30:00Z"), "America/New_York", 4)).toBe("2026-03-08");
+  });
+
   it("localToUtc and bounds", () => {
     expect(localToUtc("2026-11-14", "04:00").toISOString()).toBe("2026-11-14T00:30:00.000Z");
     const b = gameDayBounds("2026-11-14");
