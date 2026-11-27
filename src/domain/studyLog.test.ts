@@ -61,6 +61,13 @@ describe("study-log domain", () => {
     expect(() => studyLog.validateStudyLogDecision(source, missingBlank)).toThrow();
     const multipleBlanks = { ...valid, reviews: valid.reviews.map((review) => ({ ...review, front: "{{blank}} uses a {{blank}}." })) };
     expect(() => studyLog.validateStudyLogDecision(source, multipleBlanks)).toThrow();
+
+    const caseSensitive = {
+      decision: "schedule" as const,
+      reason: "The notes contain a useful identifier.",
+      reviews: Array.from({ length: 4 }, () => ({ front: "The {{blank}} is X.", back: "ID", evidence: "The ID is X." })),
+    };
+    expect(() => studyLog.validateStudyLogDecision("The ID is X.", { ...caseSensitive, reviews: caseSensitive.reviews.map((review) => ({ ...review, back: "id" })) })).toThrow();
   });
 
   it("validates retry material and action-specific snooze dates", () => {

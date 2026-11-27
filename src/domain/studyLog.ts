@@ -69,7 +69,7 @@ export const studyLogDecisionSchema = z.discriminatedUnion("decision", [
 export type StudyLogDecision = z.infer<typeof studyLogDecisionSchema>;
 
 function normalizeEvidence(value: string): string {
-  return value.normalize("NFKC").replace(/\s+/gu, " ").trim().toLowerCase();
+  return value.normalize("NFKC").replace(/\s+/gu, " ").trim();
 }
 
 export function validateStudyLogDecision(sourceText: string, candidate: unknown): StudyLogDecision {
