@@ -62,13 +62,27 @@ completed block running. Eligible selected course lessons, personal tasks, and m
 their existing server services; progress-driven Today goals continue to update from recorded focus and their existing
 progress rules. Finishing earlier records elapsed time without automatically completing the selected task.
 
+## AI-assisted study logs
+
+Study logs are a user-triggered workflow, separate from focus sessions and the existing review-card scheduler. The
+`/study-log` page and authenticated `/api/study-logs` routes persist the submitted topic, source notes/transcript, and
+optional course references before calling the existing guarded AI adapter; the network call runs outside the database
+transaction. `src/server/studyLogs.ts` owns validation, owner checks, retries, review actions, and the atomic writes to
+`study_logs` and `study_log_reviews`, declared in `src/db/schema.ts` and created by migration
+`src/db/migrations-pg/0005_study_logs.up.sql`. The decision schema requires
+exactly four prompts for a schedule, and every prompt must include evidence found in the submitted source. The server
+computes date-only review dates at +3, +7, +14, and +30 calendar days, then stores the decision and all reviews atomically
+under the owning user's transaction. Invalid or unavailable AI results leave a retryable study log without partial
+reviews. `app/(app)/forge/StudyLogReviews.tsx` reads due reviews directly, so reminder settings never hide them; when
+enabled, `src/server/reminders.ts` offers due reviews before routine anchors and applies the existing per-day cap.
+
 ## Where things live
 
 | Path | What |
 |---|---|
 | `app/` | Pages (`(app)/…`), API routes (`api/…`), `login`, `onboarding`, `healthz` |
-| `src/server/` | Domain services (auth, focus, tests, habits, quests, plan, reviews, backup, …) |
-| `src/domain/` | Pure game/engine logic (XP, score, planner, triage, habits, exam) — no database, easy to test |
+| `src/server/` | Domain services (auth, focus, tests, habits, quests, plan, reviews, study logs, reminders, backup, …) |
+| `src/domain/` | Pure game/engine logic (XP, score, planner, triage, habits, exam, study-log validation/date rules) — no database, easy to test |
 | `src/events/` | Event store, projections and replay |
 | `src/db/` | Schema (`schema.ts`), client + transactions, migrator, `migrations-pg/`, test harness |
 | `src/config/` | Game configuration schema/defaults (editable and versioned in Settings) |
