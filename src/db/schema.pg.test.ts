@@ -39,10 +39,12 @@ describe("postgres baseline (Database V2, S1)", () => {
     );
     const names = rows.map((r) => r.table_name);
     expect(names).toContain("_migrations");
+    expect(names).toContain("study_logs");
+    expect(names).toContain("study_log_reviews");
     for (const table of Object.keys(pgTables)) expect(names, table).toContain(table);
-    // 70 application tables + the migration journal
+    // 72 application tables + the migration journal
     expect(names.length).toBe(Object.keys(pgTables).length + 1);
-    expect(Object.keys(pgTables)).toHaveLength(70);
+    expect(Object.keys(pgTables)).toHaveLength(72);
   });
 
   it("records the applied version with its checksum", async () => {
@@ -242,6 +244,38 @@ describe("postgres baseline (Database V2, S1)", () => {
         [now],
       ),
     ).rejects.toMatchObject({ code: "23505" });
+
+    await db.query(
+      `INSERT INTO study_logs (id, user_id, client_request_id, topic, studied_on, source_text, created_at, updated_at)
+       VALUES ('sl1', 'u1', 'study-request-1', 'BFS', '2026-11-18', 'BFS explores a graph by distance.', $1, $1)`,
+      [now],
+    );
+    await expect(
+      db.query(
+        `INSERT INTO study_logs (id, user_id, client_request_id, topic, studied_on, source_text, created_at, updated_at)
+         VALUES ('sl2', 'u1', 'study-request-1', 'DFS', '2026-11-18', 'DFS explores a graph by depth.', $1, $1)`,
+        [now],
+      ),
+    ).rejects.toMatchObject({ code: "23505" });
+    await db.query(
+      `INSERT INTO study_log_reviews (id, user_id, study_log_id, checkpoint, offset_days, front, back, scheduled_on, due_on, created_at, updated_at)
+       VALUES ('slr1', 'u1', 'sl1', 1, 3, 'Question', 'Answer', '2026-11-21', '2026-11-21', $1, $1)`,
+      [now],
+    );
+    await expect(
+      db.query(
+        `INSERT INTO study_log_reviews (id, user_id, study_log_id, checkpoint, offset_days, front, back, scheduled_on, due_on, created_at, updated_at)
+         VALUES ('slr2', 'u1', 'sl1', 1, 3, 'Question', 'Answer', '2026-11-21', '2026-11-21', $1, $1)`,
+        [now],
+      ),
+    ).rejects.toMatchObject({ code: "23505" });
+    await expect(
+      db.query(
+        `INSERT INTO study_log_reviews (id, user_id, study_log_id, checkpoint, offset_days, front, back, scheduled_on, due_on, created_at, updated_at)
+         VALUES ('slr3', 'u1', 'sl1', 1, 4, 'Question', 'Answer', '2026-11-21', '2026-11-21', $1, $1)`,
+        [now],
+      ),
+    ).rejects.toMatchObject({ code: "23514" });
 
     await expect(
       db.query("INSERT INTO xp_ledger (id,user_id,amount,reason,rule_key,week_id,game_day,occurred_at) VALUES ('x1','u1',-5,'r','k','2026-11-14','2026-11-18',$1)", [
