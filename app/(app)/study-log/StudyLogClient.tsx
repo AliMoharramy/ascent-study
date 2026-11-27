@@ -77,6 +77,7 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
   const [busy, setBusy] = useState(false);
   const [pendingSubmission, setPendingSubmission] = useState<StableMutationAttempt<Record<string, unknown>> | null>(null);
   const [pendingSubmissionId, setPendingSubmissionId] = useState<string | null>(null);
+  const [recoveryInitialized, setRecoveryInitialized] = useState(false);
   const [pendingRetries, setPendingRetries] = useState<Record<string, StableMutationAttempt<Record<string, unknown>>>>({});
   const [recoveredRetryIds, setRecoveredRetryIds] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
@@ -95,6 +96,8 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
   const pollOffset = useRef(0);
   const pollInFlight = useRef(false);
   const finalizedLeases = useRef(new Set<string>());
+  const recoveryInitializedRef = useRef(false);
+  const pendingSubmissionIdRef = useRef<string | null>(null);
 
   const recent = useMemo(() => mergeStudyLogSummaries(
     [...p.recent, ...olderItems.filter((item) => !p.recent.some((current) => current.id === item.id))],
@@ -155,6 +158,17 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
   useEffect(() => {
     const storage = recoveryStorage();
     const markers = storage ? readStudyLogRecoveryMarkers(storage).filter((marker) => marker.kind === "submission" || marker.kind === "retry") : [];
+    for (const marker of markers) {
+      if (marker.kind === "submission") {
+        pendingSubmissionIdRef.current = marker.clientRequestId;
+        setPendingSubmissionId(marker.clientRequestId);
+      } else {
+        setRecoveredRetryIds((current) => ({ ...current, [marker.studyLogId]: marker.clientRequestId }));
+      }
+    }
+    // Restore identities synchronously before reconciliation starts; a fast submit must reuse the saved key.
+    recoveryInitializedRef.current = true;
+    setRecoveryInitialized(true);
     if (!storage || markers.length === 0) return;
     let cancelled = false;
     const requestIds = markers.map((marker) => marker.clientRequestId);
@@ -171,7 +185,10 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
               continue;
             }
             clearStudyLogRecoveryMarker(storage, marker.clientRequestId);
-            setPendingSubmissionId(null);
+            if (pendingSubmissionIdRef.current === marker.clientRequestId) {
+              pendingSubmissionIdRef.current = null;
+              setPendingSubmissionId((current) => current === marker.clientRequestId ? null : current);
+            }
             try {
               const fresh = await apiFetch<Bundle>(`/api/study-logs/${encodeURIComponent(saved.id)}`);
               if (cancelled) return;
@@ -233,7 +250,7 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
 
   async function createLog(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy) return;
+    if (busy || !recoveryInitializedRef.current) return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -246,8 +263,9 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
       ...(chapterId ? { chapterId } : {}),
       consentToRemoteAi: true,
     };
+    const restoredId = pendingSubmissionIdRef.current ?? pendingSubmissionId;
     const attempt = pendingSubmission
-      ?? (pendingSubmissionId ? restoreMutationAttempt(pendingSubmissionId, payload) : createStableMutationAttempt(null, payload, requestId));
+      ?? (restoredId ? restoreMutationAttempt(restoredId, payload) : createStableMutationAttempt(null, payload, requestId));
     setPendingSubmission(attempt);
     const storage = recoveryStorage();
     if (storage) saveStudyLogRecoveryMarker(storage, { kind: "submission", clientRequestId: attempt.clientRequestId });
@@ -258,6 +276,7 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
       const storage = recoveryStorage();
       if (storage) clearStudyLogRecoveryMarker(storage, attempt.clientRequestId);
       setPendingSubmission(null);
+      if (pendingSubmissionIdRef.current === attempt.clientRequestId) pendingSubmissionIdRef.current = null;
       setPendingSubmissionId(null);
       setDetails((current) => ({ ...current, [result.log.id]: result }));
       setSummaryUpdates((current) => mergeStudyLogSummaries(current, [summaryFromBundle(result)]));
@@ -277,6 +296,7 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
         const storage = recoveryStorage();
         if (storage) clearStudyLogRecoveryMarker(storage, attempt.clientRequestId);
         setPendingSubmission(null);
+        if (pendingSubmissionIdRef.current === attempt.clientRequestId) pendingSubmissionIdRef.current = null;
         setPendingSubmissionId(null);
       }
       setError(ambiguous
@@ -295,6 +315,7 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
             setSelectedId(fresh.log.id);
             setRetrySource((current) => ({ ...current, [fresh.log.id]: fresh.log.sourceText }));
             setPendingSubmission(null);
+            if (pendingSubmissionIdRef.current === attempt.clientRequestId) pendingSubmissionIdRef.current = null;
             setPendingSubmissionId(null);
             setError("");
             setNotice(statusPresentation[fresh.log.status].createNotice);
@@ -373,11 +394,6 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
       void apiFetch<Bundle>(`/api/study-logs/${encodeURIComponent(id)}`).then((fresh) => {
         setDetails((current) => ({ ...current, [id]: fresh }));
         setSummaryUpdates((current) => mergeStudyLogSummaries(current, [summaryFromBundle(fresh)]));
-        if (fresh.log.status !== "processing") {
-          if (storage) clearStudyLogRecoveryMarker(storage, attempt.clientRequestId);
-          setPendingRetries((current) => { const next = { ...current }; delete next[id]; return next; });
-          setRecoveredRetryIds((current) => { const next = { ...current }; delete next[id]; return next; });
-        }
       }).catch(() => router.refresh());
     } finally {
       setRetryingId(null);
@@ -486,12 +502,13 @@ export function StudyLogClient(p: { today: string; courses: Course[]; lessons: L
 
             {error && <p role="alert" className="rounded-2xl border border-coral/50 bg-coral/10 px-4 py-3 text-body-s font-bold text-coral-ink">{error}</p>}
             {notice && <p role="status" className="rounded-2xl border border-mint/40 bg-mint/10 px-4 py-3 text-body-s font-bold text-mint-ink">{notice}</p>}
+            {!recoveryInitialized && <p role="status" className="rounded-2xl border border-yellow/40 bg-yellow/10 px-4 py-3 text-body-s text-muted">Checking for an unconfirmed study-log request before enabling submission.</p>}
             {pendingSubmission && <p role="status" className="rounded-2xl border border-yellow/40 bg-yellow/10 px-4 py-3 text-body-s text-muted">Delivery is unconfirmed. The form is locked so retrying keeps the original study details and request key.</p>}
             {pendingSubmissionId && !pendingSubmission && <p role="status" className="rounded-2xl border border-yellow/40 bg-yellow/10 px-4 py-3 text-body-s text-muted">The previous request ID was restored, but study text was not saved in browser storage. Re-enter the exact same details before retrying; the server will reject a changed payload.</p>}
             </fieldset>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
               <p className="max-w-md text-caption text-muted">Questions are saved only when all four can be grounded in your notes.</p>
-              <button className="btn-accent min-w-40 justify-center" disabled={busy || topic.trim().length < 2 || !sourceText.trim() || !consentToRemoteAi}>
+              <button className="btn-accent min-w-40 justify-center" disabled={!recoveryInitialized || busy || topic.trim().length < 2 || !sourceText.trim() || !consentToRemoteAi}>
                 <Icon name={busy ? "clock" : "arrow"} size={16} /> {busy ? "Building review path…" : pendingSubmission ? "Retry same submission" : pendingSubmissionId ? "Retry saved request ID" : "Save study log"}
               </button>
             </div>

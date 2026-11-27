@@ -45,6 +45,15 @@ try {
       lostFirstReconciliation: false,
       requestId: "",
       originalSubmissionStatus: 0,
+      submissionRequestIds: [],
+      submissionLogIds: [],
+      delayNextReconciliation: false,
+      reconciliationDelayStarted: false,
+      reconciliationDelayCompleted: false,
+      retryRequestId: "",
+      retryLogPath: "",
+      retryPostAttempted: false,
+      retryDetailStatus: "",
     };
     try {
       if (window.name.startsWith(storagePrefix)) {
@@ -56,25 +65,39 @@ try {
     const persistState = () => {
       window.name = `${storagePrefix}${JSON.stringify(state)}`;
     };
-    Object.assign(window, { __studyLogRecoveryTest: state });
+    Object.assign(window, {
+      __studyLogRecoveryTest: state,
+      __studyLogRecoveryPersistTest: persistState,
+    });
     window.fetch = async (input, init) => {
       const url = new URL(typeof input === "string" ? input : input.url, window.location.origin);
       const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
-      if (url.pathname === "/api/study-logs" && method === "POST" && !state.lostSubmissionResponse) {
-        const committedResponse = await nativeFetch(input, init);
+      if (url.pathname === "/api/study-logs" && method === "POST") {
         const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
-        state.requestId = body.clientRequestId ?? "";
-        state.originalSubmissionStatus = committedResponse.status;
-        state.lostSubmissionResponse = true;
+        const committedResponse = await nativeFetch(input, init);
+        const committedBody = await committedResponse
+          .clone()
+          .json()
+          .catch(() => ({}));
+        state.submissionRequestIds.push(body.clientRequestId ?? "");
+        state.submissionLogIds.push(committedBody?.log?.id ?? "");
+        if (!state.lostSubmissionResponse) {
+          state.requestId = body.clientRequestId ?? "";
+          state.originalSubmissionStatus = committedResponse.status;
+          state.lostSubmissionResponse = true;
+        }
         persistState();
         if (!committedResponse.ok) return committedResponse;
-        return new Response(
-          JSON.stringify({ error: { code: "simulated_lost_response", message: "simulated" } }),
-          {
-            status: 503,
-            headers: { "content-type": "application/json" },
-          },
-        );
+        if (state.submissionRequestIds.length === 1) {
+          return new Response(
+            JSON.stringify({ error: { code: "simulated_lost_response", message: "simulated" } }),
+            {
+              status: 503,
+              headers: { "content-type": "application/json" },
+            },
+          );
+        }
+        return committedResponse;
       }
       if (
         url.pathname === "/api/study-logs" &&
@@ -92,7 +115,40 @@ try {
           },
         );
       }
-      return await nativeFetch(input, init);
+      if (
+        url.pathname === "/api/study-logs" &&
+        method === "GET" &&
+        url.searchParams.has("requestIds") &&
+        state.delayNextReconciliation
+      ) {
+        state.delayNextReconciliation = false;
+        state.reconciliationDelayStarted = true;
+        persistState();
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        state.reconciliationDelayCompleted = true;
+        persistState();
+      }
+      if (method === "POST" && /^\/api\/study-logs\/[^/]+\/retry$/.test(url.pathname)) {
+        const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
+        state.retryRequestId = body.clientRequestId ?? "";
+        state.retryLogPath = url.pathname.replace(/\/retry$/, "");
+        state.retryPostAttempted = true;
+        persistState();
+        return new Response(
+          JSON.stringify({ error: { code: "simulated_lost_retry_response", message: "simulated" } }),
+          { status: 503, headers: { "content-type": "application/json" } },
+        );
+      }
+      const response = await nativeFetch(input, init);
+      if (state.retryPostAttempted && method === "GET" && url.pathname === state.retryLogPath) {
+        const detail = await response
+          .clone()
+          .json()
+          .catch(() => ({}));
+        state.retryDetailStatus = detail?.log?.status ?? "";
+        persistState();
+      }
+      return response;
     };
   });
 
@@ -108,6 +164,7 @@ try {
   const topic = `Recovery browser ${Date.now()}`;
   const sourceText =
     "BROWSER_PRIVATE_SOURCE_MARKER: a stable request identity survives reload without storing these notes.";
+  const studiedOn = await page.evaluate(() => document.querySelector('input[type="date"]')?.value ?? "");
   await page.locator('input[placeholder="e.g. Breadth-first search"]').fill(topic);
   await page.locator("textarea").fill(sourceText);
   await page.locator('input[type="checkbox"]').click();
@@ -143,7 +200,37 @@ try {
     );
   }
 
-  await page.reload({ waitUntil: "networkidle0" });
+  await page.evaluate(() => {
+    window.__studyLogRecoveryTest.delayNextReconciliation = true;
+    window.__studyLogRecoveryPersistTest();
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__studyLogRecoveryTest?.reconciliationDelayStarted, {
+    timeout: 30_000,
+  });
+  await page.locator('input[placeholder="e.g. Breadth-first search"]').fill(topic);
+  await page.locator("textarea").fill(sourceText);
+  await page.locator('input[type="date"]').fill(studiedOn);
+  await page.locator('input[type="checkbox"]').click();
+  await page.locator("form button").click();
+  await page.waitForFunction(
+    () => {
+      const state = window.__studyLogRecoveryTest;
+      return state?.submissionRequestIds?.length === 2 && !state.reconciliationDelayCompleted;
+    },
+    { timeout: 30_000 },
+  );
+  const racedSubmission = await page.evaluate(() => window.__studyLogRecoveryTest);
+  if (
+    racedSubmission.submissionRequestIds[0] !== racedSubmission.submissionRequestIds[1] ||
+    racedSubmission.submissionLogIds[0] !== racedSubmission.submissionLogIds[1]
+  ) {
+    throw new Error("Submitting while reload reconciliation was delayed created a second logical study log");
+  }
+
+  await page.waitForFunction(() => window.__studyLogRecoveryTest?.reconciliationDelayCompleted, {
+    timeout: 30_000,
+  });
   await page.waitForFunction(
     (expectedSource) => {
       const details = [...document.querySelectorAll("pre")].some(
@@ -154,7 +241,57 @@ try {
     { timeout: 30_000 },
     sourceText,
   );
-  console.log("PASS  browser reload reconciles a committed study submission without storing its source text");
+
+  const retryTextarea = page.locator('section[aria-labelledby="history-heading"] textarea');
+  await retryTextarea.fill(sourceText);
+  await page.locator('section[aria-labelledby="history-heading"] input[type="checkbox"]').click();
+  await page.locator('section[aria-labelledby="history-heading"] li button.btn-accent').click();
+  await page.waitForFunction(
+    () =>
+      window.__studyLogRecoveryTest?.retryPostAttempted && window.__studyLogRecoveryTest.retryDetailStatus,
+    { timeout: 30_000 },
+  );
+  const ambiguousRetry = await page.evaluate(() => ({
+    state: window.__studyLogRecoveryTest,
+    recovery: sessionStorage.getItem("study-log.recovery.v1"),
+  }));
+  const retryMarker = JSON.parse(ambiguousRetry.recovery ?? "[]").find(
+    (marker) =>
+      marker.kind === "retry" && marker.studyLogId === ambiguousRetry.state.retryLogPath.split("/").at(-1),
+  );
+  if (
+    !["retryable", "needs_material"].includes(ambiguousRetry.state.retryDetailStatus) ||
+    retryMarker?.clientRequestId !== ambiguousRetry.state.retryRequestId ||
+    ambiguousRetry.recovery?.includes(sourceText) ||
+    ambiguousRetry.recovery?.includes("sourceText")
+  ) {
+    throw new Error(
+      "A stale detail response cleared/replaced the retry identity or recovery storage contains private study text",
+    );
+  }
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForFunction(
+    () =>
+      [...document.querySelectorAll("button")].some((button) =>
+        button.textContent?.includes("Retry with saved ID"),
+      ),
+    { timeout: 30_000 },
+  );
+  const restoredRetryId = await page.evaluate(() => {
+    const state = window.__studyLogRecoveryTest;
+    const markers = JSON.parse(sessionStorage.getItem("study-log.recovery.v1") ?? "[]");
+    return {
+      expected: state.retryRequestId,
+      marker: markers.find((item) => item.kind === "retry")?.clientRequestId,
+    };
+  });
+  if (restoredRetryId.marker !== restoredRetryId.expected) {
+    throw new Error("The ambiguous analysis retry identity did not survive a reload");
+  }
+  console.log(
+    "PASS  delayed submission reconciliation reuses the original key; ambiguous retry identity survives stale detail and reload",
+  );
 } finally {
   await browser.close();
 }
