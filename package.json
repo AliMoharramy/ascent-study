@@ -6,9 +6,23 @@
   "license": "MIT",
   "author": "Ali Moharrami",
   "homepage": "https://github.com/AliMoharramy/ascent-study#readme",
-  "repository": { "type": "git", "url": "git+https://github.com/AliMoharramy/ascent-study.git" },
-  "bugs": { "url": "https://github.com/AliMoharramy/ascent-study/issues" },
-  "keywords": ["study", "exam-prep", "habit-tracker", "gamification", "spaced-repetition", "nextjs", "postgresql", "self-hosted"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AliMoharramy/ascent-study.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AliMoharramy/ascent-study/issues"
+  },
+  "keywords": [
+    "study",
+    "exam-prep",
+    "habit-tracker",
+    "gamification",
+    "spaced-repetition",
+    "nextjs",
+    "postgresql",
+    "self-hosted"
+  ],
   "type": "module",
   "engines": {
     "node": "22.x"
@@ -28,6 +42,7 @@
     "test:watch": "vitest",
     "test:pg": "vitest run --config vitest.pg.config.ts",
     "smoke": "node scripts/smoke.mjs",
+    "smoke:study-log-browser": "node scripts/study-log-recovery.browser.mjs",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "user:create": "tsx scripts/create-user.ts",

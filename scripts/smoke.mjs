@@ -52,7 +52,7 @@ if (login.status !== 200) process.exit(1);
 check("onboarding", (await json("/api/reviews", { action: "onboarding" })).status === 200);
 
 // 2) every page must render (no 5xx, no redirect loop to /login)
-const pages = ["/today", "/plan", "/map", "/courses", "/deck", "/forge", "/habits", "/ideas", "/life", "/rest", "/review",
+const pages = ["/today", "/plan", "/map", "/courses", "/study-log", "/deck", "/forge", "/habits", "/ideas", "/life", "/rest", "/review",
   "/run", "/settings", "/sheets", "/final", "/arena", "/arena/exam", "/baseline", "/character", "/coach", "/codex",
   "/report/monthly", "/focus", "/onboarding", "/map/ai-1", "/review?tab=monthly", "/life?tab=monthly"];
 const courses = await call("/courses");
@@ -64,14 +64,35 @@ for (const p of pages) {
   const redirected = res.status >= 300 && res.status < 400;
   check(`page ${p}`, res.status === 200 && !redirected, `HTTP ${res.status}${redirected ? ` → ${res.headers.get("location")}` : ""}`);
 }
+const studyLogPage = await call("/study-log");
+const studyLogHtml = await studyLogPage.text();
+check("study-log discloses remote AI consent and lesson/video link", studyLogPage.status === 200 && studyLogHtml.includes("configured AI provider") && studyLogHtml.includes("Lesson / video"), `HTTP ${studyLogPage.status}`);
+const forgeReview = await call("/forge?tab=review");
+const forgeReviewHtml = await forgeReview.text();
+check("Forge fixed study-review section", forgeReview.status === 200 && forgeReviewHtml.includes("Study-log reviews"), `HTTP ${forgeReview.status}`);
 
 // 3) main read APIs and one write
-for (const p of ["/api/tests", "/api/reviews", "/api/xp", "/api/plan", "/api/habits", "/api/quests", "/api/checkin", "/api/ideas", "/api/backups"]) {
+for (const p of ["/api/tests", "/api/reviews", "/api/xp", "/api/plan", "/api/habits", "/api/quests", "/api/checkin", "/api/ideas", "/api/backups", "/api/study-logs"]) {
   const res = await call(p);
   check(`api GET ${p}`, res.status === 200, `HTTP ${res.status}`);
 }
 const write = await json("/api/tests", { correct: 6, wrong: 1, blank: 0, clientRequestId: `smoke-${Date.now()}` });
 check("api POST /api/tests", write.status === 200, `HTTP ${write.status}`);
+const studySource = "Breadth-first search uses a queue to visit vertices by distance.";
+const noStudyConsent = await json("/api/study-logs", { topic: "Smoke study log", sourceText: studySource, clientRequestId: `smoke-study-no-consent-${Date.now()}` });
+check("study-log rejects missing AI consent", noStudyConsent.status === 400, `HTTP ${noStudyConsent.status}`);
+const studyRequestId = `smoke-study-${Date.now()}`;
+const studyWrite = await json("/api/study-logs", { topic: "Smoke study log", sourceText: studySource, clientRequestId: studyRequestId, consentToRemoteAi: true });
+const studyResult = await studyWrite.json().catch(() => ({}));
+check("api POST /api/study-logs", studyWrite.status === 200 && !!studyResult.log?.id, `HTTP ${studyWrite.status}`);
+const reconciledStudy = await call(`/api/study-logs?requestIds=${encodeURIComponent(studyRequestId)}`);
+const reconciliation = await reconciledStudy.json().catch(() => ({}));
+check("api GET study-log request reconciliation", reconciledStudy.status === 200 && reconciliation.studyLogs?.[0]?.clientRequestId === studyRequestId && !("sourceText" in (reconciliation.studyLogs?.[0] ?? {})), `HTTP ${reconciledStudy.status}`);
+if (studyResult.log?.id) {
+  const studyDetail = await call(`/api/study-logs/${encodeURIComponent(studyResult.log.id)}`);
+  const detailResult = await studyDetail.json().catch(() => ({}));
+  check("api GET study-log detail", studyDetail.status === 200 && detailResult.log?.sourceText === studySource, `HTTP ${studyDetail.status}`);
+}
 for (const body of [{ action: "monthly", wins: "w", risks: "r", oneChange: "keep going" }]) {
   const res = await json("/api/reviews", body);
   check(`api POST /api/reviews ${body.action}`, res.status === 200, `HTTP ${res.status}`);

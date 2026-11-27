@@ -9,12 +9,14 @@ import { CAUSES, ErrorLogDialog, type ChapterOpt } from "@/ui/ErrorLog";
 import { useFeedback } from "@/ui/feedback";
 import { Icon } from "@/ui/icons";
 import { ForgeInsights } from "./ForgeInsights";
+import { StudyLogReviews } from "./StudyLogReviews";
 
 type Err = { id: string; cause: string; takeaway: string; chapterId: string | null; subjectId: string | null; sourceRef: string | null; repeatedCount: number; gameDay: string };
 type CardT = { id: string; front: string; back: string; dueOn: string; reps: number; step: number };
+type StudyLogReviewT = { id: string; studyLogId: string; checkpoint: number; offsetDays: number; front: string; back: string; scheduledOn: string; dueOn: string; status: "pending" | "done" | "skipped" | "canceled"; topic: string };
 type Art = { id: string; title: string; bodyMd: string; chapterId: string | null; kind: string; updatedAt: string };
 
-export function ForgeClient(p: { tab: string; filters: { q: string; cause: string; subject: string }; errors: Err[]; causes: { cause: string; n: number }[]; due: CardT[]; cards: number; artifacts: Art[]; subjects: { id: string; name: string }[]; chapters: ChapterOpt[]; reviewXpLeft: number; mining: Parameters<typeof ForgeInsights>[0]["mining"]; time: Parameters<typeof ForgeInsights>[0]["time"]; skip: Parameters<typeof ForgeInsights>[0]["skip"] }) {
+export function ForgeClient(p: { tab: string; filters: { q: string; cause: string; subject: string }; errors: Err[]; causes: { cause: string; n: number }[]; due: CardT[]; studyLogDue: StudyLogReviewT[]; today: string; cards: number; artifacts: Art[]; subjects: { id: string; name: string }[]; chapters: ChapterOpt[]; reviewXpLeft: number; mining: Parameters<typeof ForgeInsights>[0]["mining"]; time: Parameters<typeof ForgeInsights>[0]["time"]; skip: Parameters<typeof ForgeInsights>[0]["skip"] }) {
   const router = useRouter();
   const [tab, setTab] = useState(p.tab);
   const [q, setQ] = useState(p.filters.q);
@@ -121,6 +123,7 @@ export function ForgeClient(p: { tab: string; filters: { q: string; cause: strin
 
       {tab === "review" && (
         <>
+          <StudyLogReviews due={p.studyLogDue} today={p.today} />
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-3xl bg-surface-2 p-4">
             <p className="text-body-s">Ten due or recent cards, five minutes, no new-test pressure.</p>
             <Link href="/deck" className="btn-accent">

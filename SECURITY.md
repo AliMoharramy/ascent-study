@@ -39,4 +39,4 @@ Telegram, AI providers).
   separate from the backups.
 - **Secrets** (database URLs, AI/Telegram keys, `CRON_SECRET`, `OFFSITE_KEY`, `SETUP_TOKEN`) live only in environment
   variables. Never commit them; never put production credentials in Preview/Development environments.
-- **AI:** only aggregate numbers are sent to a remote model, with daily and monthly caps; the app works fully without AI.
+- **AI:** by default, only aggregate numbers are sent to a remote model, with daily and monthly caps. Study-log planning is an explicit exception: after per-session consent, the topic and notes/transcript may be sent to the configured provider; course, lesson, and chapter references stay local. The app works fully without AI.

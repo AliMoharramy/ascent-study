@@ -35,8 +35,8 @@ browser ──HTTP──▶ route handler / server component
 
 ## Key design rules
 
-1. **Event sourcing.** Every mutation appends to the `events` table; XP / score / gold / gems ledgers are *projections*
-   that can be rebuilt (`replayAll`) and compared (`npm run replay`). Projections run in the same transaction as the event.
+1. **Event sourcing.** Every canonical domain mutation appends to the `events` table; XP / score / gold / gems ledgers are *projections*
+   that can be rebuilt (`replayAll`) and compared (`npm run replay`). Projections run in the same transaction as the event. Derived presentation rows, such as materialized reminders regenerated from their source records, are not independent domain mutations.
 2. **One transaction per domain operation**, taken through `withUserTransaction` (`src/db/client.ts`). It holds a
    per-user advisory lock, so two requests for the same user never interleave a read-modify-write. Nested calls only open
    a savepoint (the lock is re-entrant), which keeps partial rollback working.
@@ -62,13 +62,40 @@ completed block running. Eligible selected course lessons, personal tasks, and m
 their existing server services; progress-driven Today goals continue to update from recorded focus and their existing
 progress rules. Finishing earlier records elapsed time without automatically completing the selected task.
 
+## AI-assisted study logs
+
+Study logs are a user-triggered workflow, separate from focus sessions and the existing review-card scheduler. The
+`/study-log` page and authenticated `/api/study-logs` routes persist the submitted topic, source notes/transcript, and
+optional course references. A per-session consent checkbox is required before any study text can reach the configured
+AI provider; the provider receives only topic and source text, while course, lesson/video, and chapter references stay
+local. The network call runs outside the database transaction. `src/server/studyLogs.ts` owns validation, owner checks,
+retries, review actions, and the atomic writes to `study_logs` and `study_log_reviews`, declared in `src/db/schema.ts`
+and created by migrations `0005_study_logs.up.sql` and `0006_study_log_ai_consent.up.sql`. A schedule requires exactly
+four cloze prompts: each has one `{{blank}}`, and filling it with the answer must reproduce a short source excerpt
+exactly after Unicode and whitespace normalization. This prevents unsupported facts from appearing in either side of a
+review card. The server computes date-only review dates at +3, +7, +14, and +30 calendar days, then stores the decision
+and all reviews atomically under the owning user's transaction. Failed analysis or persistence leaves a retryable log;
+if the database cannot record that recovery state, the five-minute analysis lease permits a later retry. Retry requests
+and review actions use replay-safe `clientRequestId` events. `app/(app)/forge/StudyLogReviews.tsx` reads due reviews
+directly, so reminder settings never hide them; enabled reminders are materialized presentation rows from due reviews,
+are offered before routine anchors, and use the existing per-day cap.
+
+The AI monthly cost cap is an application-level admission estimate based on configured per-token prices and a
+conservative request-size/output allowance; it is not a provider-enforced hard spend limit. Valid reported token counts
+are recorded as actual usage and settled at their configured-price estimate, even when that amount exceeds the prior
+reservation or monthly cap. Such an overrun is charged to the current accounting month and blocks later admissions
+until that game-day month rolls off. Missing, malformed, or unavailable usage stays unknown and keeps the full
+reservation charged for its game-day and monthly windows; expired in-flight reservations use the same policy.
+Browser recovery stores request IDs and review action metadata in session storage, never source notes, and reconciles
+those IDs through owner-scoped summaries and accepted mutation events.
+
 ## Where things live
 
 | Path | What |
 |---|---|
 | `app/` | Pages (`(app)/…`), API routes (`api/…`), `login`, `onboarding`, `healthz` |
-| `src/server/` | Domain services (auth, focus, tests, habits, quests, plan, reviews, backup, …) |
-| `src/domain/` | Pure game/engine logic (XP, score, planner, triage, habits, exam) — no database, easy to test |
+| `src/server/` | Domain services (auth, focus, tests, habits, quests, plan, reviews, study logs, reminders, backup, …) |
+| `src/domain/` | Pure game/engine logic (XP, score, planner, triage, habits, exam, study-log validation/date rules) — no database, easy to test |
 | `src/events/` | Event store, projections and replay |
 | `src/db/` | Schema (`schema.ts`), client + transactions, migrator, `migrations-pg/`, test harness |
 | `src/config/` | Game configuration schema/defaults (editable and versioned in Settings) |

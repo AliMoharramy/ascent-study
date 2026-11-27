@@ -118,6 +118,7 @@
 | F-ERR-04 | Forge Artifacts | ثبت محصولات یادگیری (برگه خلاصه، سؤال خودساخته، توضیح)؛ پیوند به فصل؛ Markdown ساده | P1 | R2 |
 | F-ERR-05 | Weak‑Point Hunter | فهرست ۱۰ فصل/علت ضعیف؛ پیشنهاد مأموریت | P2 | R4 |
 | F-ERR-06 | دورهای مرور (TOC ۳ دور) | زمان‌بندی خودکار دور ۲ و ۳ | P2 | R3 |
+| F-ERR-07 | AI-assisted study logging and review planning | Save notes/transcripts with a topic and optional course, lesson/video, or chapter reference; require per-session consent before sending topic and source text to the configured AI provider; keep references local; accept only four cloze reviews whose answers reconstruct source excerpts; choose schedule, no sequence, or needs material; schedule for calendar days +3/+7/+14/+30; support retry after failure and complete, snooze, skip, or cancel actions in Forge | P1 | R4 |
 
 ## M7 — عادت‌ها و ستون‌ها
 
@@ -191,7 +192,7 @@
 
 | ID | فیچر | AC | Pri | Rel |
 |---|---|---|---|---|
-| F-NOT-01 | یادآوری‌های Anchor | در ساعت لنگرها؛ تنظیم؛ حداکثر ۵ در روز | P2 | R4 |
+| F-NOT-01 | یادآوری‌های Anchor و مرورهای مطالعه | در ساعت لنگرها؛ تنظیم؛ حداکثر ۵ یادآوری در روز به‌صورت مشترک با مرورهای مطالعهٔ سررسیدشده | P2 | R4 |
 | F-NOT-02 | Push وب (PWA) | با اجازهٔ کاربر | P3 | R5 |
 | F-NOT-03 | Telegram Bot (اختیاری) | ارسال یادآوری و ثبت سریع | P3 | R5 |
 

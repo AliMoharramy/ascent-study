@@ -6,6 +6,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- AI-assisted study logs with per-session AI consent, verifiable source-grounded cloze reviews, fixed +3/+7/+14/+30-day scheduling, replay-safe retries and Forge actions, and capped due-review reminders.
 - Archie study reports for today, yesterday, this or last week/month, the last N days, or explicit Gregorian/Jalali ranges. Reports include total time, active-day average, daily and subject/chapter/focus-type breakdowns, and recent session details; report details stay out of remote AI requests.
 - Focus sessions persist the selected task source and ID, keeping the website and Windows widget on the same task across refreshes and restarts.
 - Website and Windows focus timers now stop at 25 active minutes, record a fixed-length block, and complete eligible selected tasks through the existing backend rules.

@@ -440,6 +440,47 @@ export const reviewCards = pgTable("review_cards", {
   updatedAt: ts("updated_at").notNull(),
 });
 
+export type StudyLogStatus = "pending" | "processing" | "retryable" | "needs_material" | "no_sequence" | "scheduled";
+export type StudyLogDecisionKind = "schedule" | "no_sequence" | "needs_material";
+
+export const studyLogs = pgTable("study_logs", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  clientRequestId: text("client_request_id").notNull(),
+  requestFingerprint: text("request_fingerprint"),
+  topic: text("topic").notNull(),
+  courseId: text("course_id"),
+  lessonId: text("lesson_id"),
+  chapterId: text("chapter_id"),
+  studiedOn: day("studied_on").notNull(),
+  sourceText: text("source_text").notNull(),
+  status: text("status").$type<StudyLogStatus>().notNull().default("pending"),
+  decision: text("decision").$type<StudyLogDecisionKind>(),
+  reason: text("reason").notNull().default(""),
+  analysisStartedAt: ts("analysis_started_at"),
+  aiConsentAt: ts("ai_consent_at"),
+  createdAt: ts("created_at").notNull(),
+  updatedAt: ts("updated_at").notNull(),
+});
+
+export type StudyLogReviewStatus = "pending" | "done" | "skipped" | "canceled";
+
+export const studyLogReviews = pgTable("study_log_reviews", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  studyLogId: text("study_log_id").notNull(),
+  checkpoint: integer("checkpoint").notNull(),
+  offsetDays: integer("offset_days").notNull(),
+  front: text("front").notNull(),
+  back: text("back").notNull(),
+  scheduledOn: day("scheduled_on").notNull(),
+  dueOn: day("due_on").notNull(),
+  status: text("status").$type<StudyLogReviewStatus>().notNull().default("pending"),
+  doneOn: day("done_on"),
+  createdAt: ts("created_at").notNull(),
+  updatedAt: ts("updated_at").notNull(),
+});
+
 export const forgeArtifacts = pgTable("forge_artifacts", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
@@ -860,10 +901,31 @@ export const aiCalls = pgTable("ai_calls", {
   provider: text("provider").notNull(),
   tokensIn: integer("tokens_in").notNull().default(0),
   tokensOut: integer("tokens_out").notNull().default(0),
+  usageStatus: text("usage_status").$type<"actual" | "estimated" | "unknown">().notNull().default("estimated"),
   costEst: num("cost_est").notNull().default(0),
   requestSummary: text("request_summary").notNull().default(""),
   responseJson: text("response_json").notNull().default("{}"),
+  gameDay: day("game_day"),
+  budgetMonth: text("budget_month"),
+  reservationId: text("reservation_id"),
   createdAt: ts("created_at").notNull(),
+});
+
+export type AiBudgetReservationStatus = "reserved" | "settled" | "uncertain";
+
+export const aiBudgetReservations = pgTable("ai_budget_reservations", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  requestId: text("request_id").notNull(),
+  purpose: text("purpose").notNull(),
+  gameDay: day("game_day").notNull(),
+  budgetMonth: text("budget_month").notNull(),
+  reservedCost: num("reserved_cost").notNull(),
+  settledCost: num("settled_cost").notNull().default(0),
+  status: text("status").$type<AiBudgetReservationStatus>().notNull(),
+  expiresAt: ts("expires_at").notNull(),
+  createdAt: ts("created_at").notNull(),
+  updatedAt: ts("updated_at").notNull(),
 });
 
 export const reminders = pgTable("reminders", {
@@ -875,6 +937,7 @@ export const reminders = pgTable("reminders", {
   body: text("body").notNull(),
   dueAt: ts("due_at").notNull(),
   readAt: ts("read_at"),
+  dismissedAt: ts("dismissed_at"),
   createdAt: ts("created_at").notNull(),
 });
 
@@ -968,6 +1031,8 @@ export const pgTables = {
   week_plan_items: weekPlanItems,
   error_items: errorItems,
   review_cards: reviewCards,
+  study_logs: studyLogs,
+  study_log_reviews: studyLogReviews,
   forge_artifacts: forgeArtifacts,
   habits,
   habit_logs: habitLogs,
@@ -1002,6 +1067,7 @@ export const pgTables = {
   wellness_logs: wellnessLogs,
   pretests,
   ai_calls: aiCalls,
+  ai_budget_reservations: aiBudgetReservations,
   reminders,
   challenge_cards: challengeCards,
   season_claims: seasonClaims,

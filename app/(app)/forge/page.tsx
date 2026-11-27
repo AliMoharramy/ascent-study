@@ -3,6 +3,7 @@ import { queryOne } from "@/db/client";
 import { chapters, subjects } from "@/db/schema";
 import { requireUser } from "@/server/context";
 import { allCards, causeBreakdown, dueCards, listArtifacts, listErrors } from "@/server/forge";
+import { dueStudyLogReviews } from "@/server/studyLogs";
 import { miningView, skipView, timeView } from "@/server/insights";
 import { PageHeader } from "@/ui/components";
 import { MascotSlot } from "@/ui/Mascot";
@@ -29,6 +30,8 @@ export default async function ForgePage({ searchParams }: { searchParams: Promis
         errors={(await listErrors(db, userId, { q: sp.q, cause: sp.cause, subjectId: sp.subject }))}
         causes={(await causeBreakdown(db, userId))}
         due={due}
+        studyLogDue={await dueStudyLogReviews(db, userId, today)}
+        today={today}
         cards={(await allCards(db, userId)).length}
         artifacts={(await listArtifacts(db, userId, sp.q))}
         subjects={subs}

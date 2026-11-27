@@ -26,6 +26,7 @@ const NAV: { path: string; label: string; icon: IconName; keys: string }[] = [
   { path: "/ideas", label: "Idea Vault", icon: "bulb", keys: "park detour builder" },
   { path: "/character", label: "Character", icon: "user", keys: "achievements shop gold hall of fame" },
   { path: "/courses", label: "Courses", icon: "book", keys: "lessons videos" },
+  { path: "/study-log", label: "Study log", icon: "book", keys: "notes transcript study session spaced recall reviews" },
   { path: "/codex", label: "Codex", icon: "layers", keys: "decisions design" },
   { path: "/settings", label: "Settings", icon: "gear", keys: "config flags backup theme" },
   { path: "/arena/exam", label: "Exam simulator", icon: "clock", keys: "timer answer sheet mock" },
