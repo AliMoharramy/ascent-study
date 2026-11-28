@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch } from "@/ui/client";
-import { cx, Eyebrow } from "@/ui/components";
+import { cx } from "@/ui/components";
 import { Icon } from "@/ui/icons";
 import { useFeedback } from "@/ui/feedback";
 
@@ -22,7 +22,7 @@ export type QuestItem = {
 const TIERS = ["seed", "standard", "stretch"] as const;
 
 /** Daily Fixed / Pillars / Comeback list (S01). Habit quests are ticked here at a tier; study quests fill from logs. */
-export function QuestList({ quests, title, tone = "surface", className }: { quests: QuestItem[]; title: string; tone?: "surface" | "lime"; className?: string }) {
+export function QuestList({ quests, title, tone = "surface", compact = false, className }: { quests: QuestItem[]; title: string; tone?: "surface" | "lime"; compact?: boolean; className?: string }) {
   const { toast } = useFeedback();
   const [busy, setBusy] = useState<string | null>(null);
   async function tick(q: QuestItem, t: (typeof TIERS)[number] | null) {
@@ -36,15 +36,15 @@ export function QuestList({ quests, title, tone = "surface", className }: { ques
     }
   }
   return (
-    <section className={cx("card flex flex-col gap-3", tone === "lime" && "bg-lime text-on-color", className)} aria-label={title}>
-      <Eyebrow>{title}</Eyebrow>
-      {quests.length === 0 && <p className="text-body-s text-muted">Nothing here today.</p>}
+    <section className={cx(compact ? "flex min-w-0 flex-col gap-3" : "card flex flex-col gap-3", tone === "lime" && "bg-lime text-on-color", className)} aria-label={title}>
+      <h3 className="text-caption font-extrabold uppercase tracking-[0.14em]">{title}</h3>
+      {quests.length === 0 && <p className="text-body-s text-muted">No active quests in this group today.</p>}
       <ul className="flex flex-col gap-2">
         {quests.map((q) => {
           const manual = !!q.habitId || q.target.metric === "check";
           const pct = q.target.metric === "count" && q.habitId ? null : Math.min(1, q.progress / Math.max(1, q.target.standard));
           return (
-            <li key={q.id} className={cx("rounded-2xl p-3", tone === "lime" ? "bg-on-color/10" : "bg-surface-2")}>
+            <li key={q.id} className={cx("min-w-0 rounded-2xl p-3", tone === "lime" ? "bg-on-color/10" : "bg-surface-2")}>
               <div className="flex items-start gap-3">
                 <span className={cx("mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border-2", q.tierDone ? "border-lime bg-lime text-on-color" : "border-line")} aria-hidden="true">
                   {q.tierDone && <Icon name="check" size={13} />}

@@ -67,6 +67,19 @@ export async function dueCards(db: Db, userId: string, today: string) {
   return (await db.select().from(reviewCards).where(and(eq(reviewCards.userId, userId), lte(reviewCards.dueOn, today))).orderBy(asc(reviewCards.dueOn)).limit(200));
 }
 
+/** Exact owner-scoped due count plus a small preview for Today; answers stay in the review flow. */
+export async function dueCardSummary(db: Db, userId: string, today: string, previewLimit = 4) {
+  const condition = and(eq(reviewCards.userId, userId), lte(reviewCards.dueOn, today));
+  const [total] = await db.select({ count: sql<number>`count(*)::int` }).from(reviewCards).where(condition);
+  const limit = Math.max(1, Math.min(10, Math.floor(previewLimit) || 1));
+  const cards = await db.select({ id: reviewCards.id, front: reviewCards.front, dueOn: reviewCards.dueOn, refType: reviewCards.refType })
+    .from(reviewCards)
+    .where(condition)
+    .orderBy(asc(reviewCards.dueOn), asc(reviewCards.id))
+    .limit(limit);
+  return { count: total?.count ?? 0, cards };
+}
+
 export async function allCards(db: Db, userId: string) {
   return (await db.select().from(reviewCards).where(eq(reviewCards.userId, userId)).orderBy(asc(reviewCards.dueOn)).limit(500));
 }

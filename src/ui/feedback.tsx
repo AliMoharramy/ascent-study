@@ -161,7 +161,7 @@ export function FeedbackProvider({ initial, sound = { enabled: false, volume: 0.
 }
 
 /** Header strip: level, XP bar, Gold, daily goal (F-DUO-03) — live. */
-export function HeaderStats({ goal }: { goal: { minutes: number; focus: number } }) {
+export function HeaderStats({ goal, showGoal = true }: { goal: { minutes: number; focus: number }; showGoal?: boolean }) {
   const { summary } = useFeedback();
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -178,10 +178,12 @@ export function HeaderStats({ goal }: { goal: { minutes: number; focus: number }
       <span className="chip border border-line bg-surface-1 text-ink" title="Season Score this week">
         SS {Math.round(summary.weekSs)}
       </span>
-      <span className="inline-flex items-center gap-2" title={`Daily goal ${goal.focus}/${goal.minutes} min`}>
-        <Icon name="target" size={16} className={goal.focus >= goal.minutes ? "text-lime" : "text-muted"} />
-        <ProgressBar value={goal.focus / Math.max(1, goal.minutes)} tone="lime" label="Daily goal" className="h-2 w-20" />
-      </span>
+      {showGoal && (
+        <span className="inline-flex items-center gap-2" title={`Daily goal ${goal.focus}/${goal.minutes} min`}>
+          <Icon name="target" size={16} className={goal.focus >= goal.minutes ? "text-lime" : "text-muted"} />
+          <ProgressBar value={goal.focus / Math.max(1, goal.minutes)} tone="lime" label="Daily goal" className="h-2 w-20" />
+        </span>
+      )}
     </div>
   );
 }

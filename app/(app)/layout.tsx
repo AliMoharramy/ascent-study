@@ -44,7 +44,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               Day {day}/{CAMPAIGN_DAYS}
             </span>
             <span className="chip bg-coral text-on-color">{daysToExam(today)} days to exam</span>
-            <HeaderStats goal={{ minutes: goal.goal.minutes, focus: goal.focus }} />
+            <HeaderStats goal={{ minutes: goal.goal.minutes, focus: goal.focus }} showGoal={path !== "/today"} />
             <PaletteTrigger />
             <ReminderBell initial={(await remindersView(db, userId, today))} />
             <span className="ms-auto text-body-s text-muted">
