@@ -109,6 +109,59 @@
 .animate-pop {
   animation: pop-in 0.28s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
+
+/* Today V2: mobile reading order is the action sequence; desktop pairs the mission with its agenda. */
+.today-command-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "heading"
+    "overview"
+    "mode"
+    "core"
+    "focus"
+    "actions"
+    "agenda"
+    "queue"
+    "progress"
+    "challenge"
+    "coach"
+    "rewards"
+    "safety"
+    "close";
+  gap: 1rem;
+}
+.today-command-grid > * { min-width: 0; }
+.today-heading { grid-area: heading; }
+.today-overview { grid-area: overview; }
+.today-mode { grid-area: mode; }
+.today-core { grid-area: core; }
+.today-focus { grid-area: focus; }
+.today-actions { grid-area: actions; }
+.today-agenda { grid-area: agenda; }
+.today-queue { grid-area: queue; }
+.today-progress { grid-area: progress; }
+.today-challenge { grid-area: challenge; }
+.today-coach { grid-area: coach; }
+.today-rewards { grid-area: rewards; }
+.today-safety { grid-area: safety; }
+.today-close { grid-area: close; }
+@media (min-width: 1280px) {
+  .today-command-grid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(20rem, 0.85fr);
+    grid-template-areas:
+      "heading heading"
+      "overview overview"
+      "mode mode"
+      "core agenda"
+      "focus agenda"
+      "actions queue"
+      "progress challenge"
+      "coach coach"
+      "rewards safety"
+      "close close";
+  }
+}
 @keyframes pulse-dot {
   50% {
     opacity: 0.35;

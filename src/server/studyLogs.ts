@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, getTableColumns, inArray, isNull, lt, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { withUserTransaction, type Db } from "@/db/client";
@@ -412,6 +412,30 @@ export async function dueStudyLogReviews(db: Db, userId: string, today: string):
     .innerJoin(studyLogs, and(eq(studyLogReviews.studyLogId, studyLogs.id), eq(studyLogReviews.userId, studyLogs.userId)))
     .where(and(eq(studyLogReviews.userId, userId), eq(studyLogs.userId, userId), eq(studyLogReviews.status, "pending"), lte(studyLogReviews.dueOn, dueDay)))
     .orderBy(asc(studyLogReviews.dueOn), asc(studyLogReviews.studyLogId), asc(studyLogReviews.checkpoint));
+}
+
+/** Exact due count and an answer-free, bounded preview for Today; reminders do not affect this queue. */
+export async function dueStudyLogReviewSummary(db: Db, userId: string, today: string, previewLimit = 4) {
+  const dueDay = isoGameDaySchema.parse(today);
+  const join = and(eq(studyLogReviews.studyLogId, studyLogs.id), eq(studyLogReviews.userId, studyLogs.userId));
+  const condition = and(
+    eq(studyLogReviews.userId, userId),
+    eq(studyLogs.userId, userId),
+    eq(studyLogReviews.status, "pending"),
+    lte(studyLogReviews.dueOn, dueDay),
+  );
+  const [total] = await db.select({ count: sql<number>`count(*)::int` })
+    .from(studyLogReviews)
+    .innerJoin(studyLogs, join)
+    .where(condition);
+  const limit = Math.max(1, Math.min(10, Math.floor(previewLimit) || 1));
+  const reviews = await db.select({ id: studyLogReviews.id, dueOn: studyLogReviews.dueOn, topic: studyLogs.topic })
+    .from(studyLogReviews)
+    .innerJoin(studyLogs, join)
+    .where(condition)
+    .orderBy(asc(studyLogReviews.dueOn), asc(studyLogReviews.studyLogId), asc(studyLogReviews.checkpoint))
+    .limit(limit);
+  return { count: total?.count ?? 0, reviews };
 }
 
 export async function actOnStudyLogReview(db: Db, userId: string, reviewId: string, input: StudyReviewActionInput, today: string): Promise<ReviewRow> {

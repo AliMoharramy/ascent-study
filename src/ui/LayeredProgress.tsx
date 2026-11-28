@@ -37,13 +37,15 @@ export function LayeredProgress({ layers, countdowns, className }: { layers: Lay
           </button>
         ))}
       </div>
-      <div className="flex flex-wrap gap-2">
-        {countdowns.map((c) => (
-          <span key={c.label} className="chip bg-on-color/90 text-white">
-            {c.label}: {c.value}
-          </span>
-        ))}
-      </div>
+      {countdowns.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {countdowns.map((c) => (
+            <span key={c.label} className="chip bg-on-color/90 text-white">
+              {c.label}: {c.value}
+            </span>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

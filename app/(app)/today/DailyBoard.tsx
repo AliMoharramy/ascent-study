@@ -49,7 +49,7 @@ export function DailyBoard({ board, loot }: { board: Board; loot: Loot }) {
 
   return (
     <>
-      <Card tone="mint" className="flex flex-col gap-3 md:col-span-3 xl:col-span-4" aria-label="Quest board">
+      <Card tone="mint" className="flex flex-col gap-3" aria-label="Quest board">
         <div className="flex items-start justify-between gap-2">
           <div>
             <Eyebrow>Quest Board · three, never five</Eyebrow>
@@ -87,7 +87,7 @@ export function DailyBoard({ board, loot }: { board: Board; loot: Loot }) {
         </div>
       </Card>
 
-      <Card tone="purple" className="flex flex-col gap-3 md:col-span-3 xl:col-span-4" aria-label="Loot chest">
+      <Card tone="purple" className="flex flex-col gap-3" aria-label="Loot chest">
         <div className="flex items-start justify-between gap-2">
           <Eyebrow>Vault chest</Eyebrow>
           <Chip tone="surface">{loot.today ? "Ready" : "After close"}</Chip>
